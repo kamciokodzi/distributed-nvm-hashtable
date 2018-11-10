@@ -1,33 +1,30 @@
 #include "NvmHashMap.hpp"
 
-struct root
-{
-	put::NvmHashMap<int> pmap;
-}
+struct root {
+    pmem::obj::persistent_ptr<NvmHashMap<int> > pmap;
+};
 
-int main(int argc, char* argv[])
-{
+int main(int argc, char *argv[]) {
 
-	std::string path = argv[1];
-	
-	pool<root> pop;
+    std::string path = argv[1];
 
-	pop = pool<root>::create(path, "", PMEMOBJ_MIN_POOL, CREATE_MODE_RW);
+    pmem::obj::pool <root> pop;
 
-	//pop = pool<root>::open(path, "");
+    pop = pmem::obj::pool<root>::create(path, "", PMEMOBJ_MIN_POOL, (S_IWUSR|S_IRUSR));
 
-	persistent_ptr<root> root_ptr;
+    //pop = pool<root>::open(path, "");
 
-	root_ptr = pop.root();
+    pmem::obj::persistent_ptr <root> root_ptr;
 
-	if(!q->pmap)
-	{
-		transaction::run(pop, [&] {
-			q->pmap = make_persistent<put::NvmHashMap<int> >();
-		});
-	}
-	
-	q->pmap->insert(10, 30);
+    root_ptr = pop.root();
 
-	// std::cout << q->pmap->get(10);
+    if (root_ptr->pmap != nullptr) {
+        pmem::obj::transaction::run(pop, [&] {
+            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int> >();
+        });
+    }
+
+    root_ptr->pmap->insert(10, 30);
+
+    // std::cout << q->pmap->get(10);
 }
