@@ -58,12 +58,12 @@ int main(int argc, char *argv[]) {
     }*/
 
     if (insertMode) {
-        for (int i = 0; i < 16; i++) {
+        for (int i = 0; i < 64; i++) {
             root_ptr->pmap->insert(i, 30+i);
         }
         std::cout << "Inserting values to array" << std::endl;
     }
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 64; i++) {
         std::cout << root_ptr->pmap->get(i) << std::endl;
     }
 

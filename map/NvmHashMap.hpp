@@ -25,7 +25,7 @@ public:
     int key;
     int hash;
     V value;
-    Segment *next;
+    pmem::obj::persistent_ptr<Segment<V> > next = nullptr;
 };
 
 
@@ -84,15 +84,83 @@ public:
     }
 
     void insert(int key, V value) {
-        this->segments[key & (INTERNAL_MAPS_COUNT-1)]->value = value;
+        int segment = key & (INTERNAL_MAPS_COUNT-1);
+
+        pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
+        bool update = false;
+        while(true)
+        {
+            if(ptr->key == key)
+            {
+                ptr->value = value;
+                update = true;
+                std::cout << "Updated value in segment " << segment << " with key " << key << std::endl;
+                break;
+            }
+            if(ptr->next != nullptr)
+                ptr = ptr->next;
+            else
+                break;
+        }
+
+        if(!update) {
+	    auto pop = pmem::obj::pool_by_vptr(this);
+	    pmem::obj::transaction::run(pop, [&] {
+                ptr->next = pmem::obj::make_persistent<Segment<V> >();
+	    });
+            ptr->next->key = key;
+            ptr->next->value = value;
+            std::cout << "Inserted value to segment " << segment << std::endl;
+        }
     }
 
     void insertNew(int key, V value) {
-        throw "Not implemented yet!";
+        int segment = key & (INTERNAL_MAPS_COUNT-1);
+
+        pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
+        bool update = false;
+        while(true)
+        {
+            if(ptr->key == key)
+            {
+                update = true;
+                std::cout << "Element with key " << key << " already exists in segment " << segment << std::endl;
+                break;
+            }
+            if(ptr->next != nullptr)
+                ptr = ptr->next;
+            else
+                break;
+        }
+
+        if(!update) {
+	    auto pop = pmem::obj::pool_by_vptr(this);
+	    pmem::obj::transaction::run(pop, [&] {
+                ptr->next = pmem::obj::make_persistent<Segment<V> >();
+	    });
+            ptr->next->key = key;
+            ptr->next->value = value;
+            std::cout << "Inserted value to segment " << segment << std::endl;
+        }
     }
 
     V get(int key) {
-        return this->segments[key & (INTERNAL_MAPS_COUNT-1)]->value;
+        int segment = key & (INTERNAL_MAPS_COUNT-1);
+        pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
+        while(true)
+        {
+            if(ptr->key == key)
+            {
+                std::cout << "Found element with key " << key << " in segment " << segment << ". Its value = " << ptr->value << std::endl;
+                return ptr->value;
+            }
+            if(ptr->next != nullptr)
+                ptr = ptr->next;
+            else
+                break;
+        }
+        std::cout << "Element not found" << std::endl;
+        return -1;
     }
 
     V remove(int key) {
