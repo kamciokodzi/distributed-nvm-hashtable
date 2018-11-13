@@ -7,9 +7,11 @@
 #include <libpmemobj++/p.hpp>
 #include <libpmemobj++/make_persistent.hpp>
 #include <libpmemobj++/make_persistent_atomic.hpp>
+#include <libpmemobj++/mutex.hpp>
 #include <unistd.h>
 #include <memory>
 #include <string.h>
+#include <mutex>
 
 #define INTERNAL_MAPS_COUNT 16
 
@@ -22,9 +24,9 @@ public:
 template<class V>
 class Segment {
 public:
-    int key;
-    int hash;
-    V value;
+    pmem::obj::p<int> key;
+    pmem::obj::p<int> hash;
+    pmem::obj::p<V> value;
     pmem::obj::persistent_ptr<Segment<V> > next = nullptr;
 };
 
@@ -35,6 +37,7 @@ private:
 
     pmem::obj::persistent_ptr<Segment<V> > segments[INTERNAL_MAPS_COUNT];
     pmem::obj::persistent_ptr<Value<long> > mc[INTERNAL_MAPS_COUNT];
+    pmem::obj::mutex segmentMutex[INTERNAL_MAPS_COUNT];
 
     size_t hash(int key) {
         return key;
@@ -85,6 +88,8 @@ public:
 
     void insert(int key, V value) {
         int segment = key & (INTERNAL_MAPS_COUNT-1);
+        
+        std::unique_lock<pmem::obj::mutex> lock(segmentMutex[segment]);
 
         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
         bool update = false;
@@ -94,7 +99,7 @@ public:
             {
                 ptr->value = value;
                 update = true;
-                std::cout << "Updated value in segment " << segment << " with key " << key << std::endl;
+//                std::cout << "Updated value in segment " << segment << " with key " << key << std::endl;
                 break;
             }
             if(ptr->next != nullptr)
@@ -110,12 +115,14 @@ public:
 	    });
             ptr->next->key = key;
             ptr->next->value = value;
-            std::cout << "Inserted value to segment " << segment << std::endl;
+  //          std::cout << "Inserted value to segment " << segment << std::endl;
         }
     }
 
     void insertNew(int key, V value) {
         int segment = key & (INTERNAL_MAPS_COUNT-1);
+        
+        std::unique_lock<pmem::obj::mutex> lock(segmentMutex[segment]);
 
         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
         bool update = false;

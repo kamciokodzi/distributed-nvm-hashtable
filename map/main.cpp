@@ -1,4 +1,7 @@
 #include "NvmHashMap.hpp"
+#include <thread>
+#include <chrono>
+#include <ctime>
 
 struct root {
     pmem::obj::persistent_ptr<NvmHashMap<int> > pmap;
@@ -13,10 +16,22 @@ bool file_exists(const char *fname) {
     return false;
 }
 
+pmem::obj::persistent_ptr<root> root_ptr;
+
+void insertFromThread(int tid)
+{
+	std::cout << "Log iFT, tid=" << tid << std::endl;
+	
+	for(int i = 63; i >= 0; i--) {
+		root_ptr->pmap->insert(i+64*tid, i+64*tid);
+	}
+}
+
 int main(int argc, char *argv[]) {
 
     pmem::obj::pool <root> pop;
     std::string path = argv[1];
+    std::string mode = argv[2];
     bool insertMode = false;
 
     try {
@@ -33,8 +48,6 @@ int main(int argc, char *argv[]) {
         std::cerr << e.what() << std::endl;
         return 1;
     }
-
-    pmem::obj::persistent_ptr <root> root_ptr;
 
     std::cout << "Log 3"<<std::endl;
     root_ptr = pop.root();
@@ -56,16 +69,41 @@ int main(int argc, char *argv[]) {
         });
         std::cout << "Log 5b"<<std::endl;
     }*/
-
+    auto start = std::chrono::system_clock::now();
     if (insertMode) {
-        for (int i = 0; i < 64; i++) {
-            root_ptr->pmap->insert(i, 30+i);
-        }
-        std::cout << "Inserting values to array" << std::endl;
-    }
-    for (int i = 0; i < 64; i++) {
-        std::cout << root_ptr->pmap->get(i) << std::endl;
-    }
+        if(mode == "multithread") {
+        	std::thread t1(insertFromThread, 0);
+		std::thread t2(insertFromThread, 1);
+		std::thread t3(insertFromThread, 2);
+		std::thread t4(insertFromThread, 3);
+		std::thread t5(insertFromThread, 4);
+		std::thread t6(insertFromThread, 5);
+		std::thread t7(insertFromThread, 6);
+		std::thread t8(insertFromThread, 7);
+        	std::cout << "Inserting values to array" << std::endl;
+		t1.join();
+		t2.join();
+		t3.join();
+		t4.join();
+		t5.join();
+		t6.join();
+		t7.join();
+		t8.join();
+	} else {
+		std::cout << "Inserting values into array" << std::endl;
+		for(int i = 511; i >= 0; i--)
+		{
+			root_ptr->pmap->insert(i, i);
+		}
+	}
 
+    }
+    auto end = std::chrono::system_clock::now();
+    std::chrono::duration<double> elapsed_time = end-start;
+    std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
+/*    for (int i = 0; i < 64; i++) {
+        root_ptr->pmap->get(i);
+    }
+*/
     std::cout << "Log 6"<<std::endl;
 }
