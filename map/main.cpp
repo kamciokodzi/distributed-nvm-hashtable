@@ -22,7 +22,7 @@ void insertFromThread(int tid)
 {
 	std::cout << "Log iFT, tid=" << tid << std::endl;
 
-	for(int i = 63; i >= 0; i--) {
+	for(int i = 1000000; i >= 0; i--) {
 		root_ptr->pmap->insert(i+64*tid, i+64*tid);
 	}
 }
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool"<<std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                    PMEMOBJ_MIN_POOL, (S_IWUSR|S_IRUSR));
+                    PMEMOBJ_MIN_POOL*16, (S_IWUSR|S_IRUSR));
             insertMode = true;
         } else {
             std::cout << "File exists, opening pool"<<std::endl;
@@ -91,8 +91,9 @@ int main(int argc, char *argv[]) {
 		t8.join();
 	} else {
 		std::cout << "Inserting values into array" << std::endl;
-		for(int i = 511; i >= 0; i--)
+		for(int i = 16000000; i >= 0; i--)
 		{
+			if(i % 10000 == 0) std::cout << i << std::endl;
 			root_ptr->pmap->insert(i, i);
 		}
 	}
@@ -101,9 +102,11 @@ int main(int argc, char *argv[]) {
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
     std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
-/*    for (int i = 0; i < 64; i++) {
+    for (int i = 0; i < 1024; i++) {
+	std::cout << "Remove index " << i << std::endl;
+	root_ptr->pmap->remove(i);
         root_ptr->pmap->get(i);
     }
-*/
+
     std::cout << "Log 6"<<std::endl;
 }

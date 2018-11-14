@@ -13,7 +13,7 @@
 #include <string.h>
 #include <mutex>
 
-#define INTERNAL_MAPS_COUNT 16
+#define INTERNAL_MAPS_COUNT 256
 
 template<class V>
         class Value {
@@ -171,15 +171,18 @@ public:
 
     int remove(int key) {
         int segment = key & (INTERNAL_MAPS_COUNT -1);
-        pmem::obj:persistent_ptr<Segment<V> > ptr = segments[segment];
+        pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
         while(true)
         {
-            if(ptr->next->key == key)
+            if(ptr->next != nullptr && ptr->next->key == key)
             {
-                std:: cout << "Found element with key" <<  key << "in segment" << segment << ". Trying to delete value = " << ptr->next->value << std:endl;
+                std::cout << "Found element with key" <<  key << "in segment" << segment << ". Trying to delete value = " << ptr->next->value << std::endl;
                 auto temp = ptr->next->next;
-                pmem::obj::delete_persistent<Segment<V> >(ptr->next);
-                ptr->next = temp;
+		auto pop = pmem::obj::pool_by_vptr(this);
+                pmem::obj::transaction::run(pop, [&] {
+			pmem::obj::delete_persistent<Segment<V> >(ptr->next);
+                });
+		ptr->next = temp;
                 return 1;
             }
             if(ptr->next != nullptr)
