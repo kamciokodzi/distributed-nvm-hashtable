@@ -21,7 +21,7 @@ pmem::obj::persistent_ptr<root> root_ptr;
 void insertFromThread(int tid)
 {
 	std::cout << "Log iFT, tid=" << tid << std::endl;
-	
+
 	for(int i = 63; i >= 0; i--) {
 		root_ptr->pmap->insert(i+64*tid, i+64*tid);
 	}

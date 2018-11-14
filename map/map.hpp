@@ -1,7 +1,7 @@
 /**
-* Map.hpp
-* 
-*/
+ * Map.hpp
+ *
+ */
 
 
 template<typename V>

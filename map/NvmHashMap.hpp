@@ -30,7 +30,6 @@ public:
     pmem::obj::persistent_ptr<Segment<V> > next = nullptr;
 };
 
-
 template<typename V>
 class NvmHashMap {
 private:
@@ -88,7 +87,7 @@ public:
 
     void insert(int key, V value) {
         int segment = key & (INTERNAL_MAPS_COUNT-1);
-        
+
         std::unique_lock<pmem::obj::mutex> lock(segmentMutex[segment]);
 
         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
@@ -109,19 +108,19 @@ public:
         }
 
         if(!update) {
-	    auto pop = pmem::obj::pool_by_vptr(this);
-	    pmem::obj::transaction::run(pop, [&] {
+            auto pop = pmem::obj::pool_by_vptr(this);
+            pmem::obj::transaction::run(pop, [&] {
                 ptr->next = pmem::obj::make_persistent<Segment<V> >();
 	    });
-            ptr->next->key = key;
-            ptr->next->value = value;
+        ptr->next->key = key;
+        ptr->next->value = value;
   //          std::cout << "Inserted value to segment " << segment << std::endl;
         }
     }
 
     void insertNew(int key, V value) {
         int segment = key & (INTERNAL_MAPS_COUNT-1);
-        
+
         std::unique_lock<pmem::obj::mutex> lock(segmentMutex[segment]);
 
         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
@@ -170,8 +169,27 @@ public:
         return -1;
     }
 
-    V remove(int key) {
-        throw "Not implemented yet!";
+    int remove(int key) {
+        int segment = key & (INTERNAL_MAPS_COUNT -1);
+        pmem::obj:persistent_ptr<Segment<V> > ptr = segments[segment];
+        while(true)
+        {
+            if(ptr->next->key == key)
+            {
+                std:: cout << "Found element with key" <<  key << "in segment" << segment << ". Trying to delete value = " << ptr->next->value << std:endl;
+                auto temp = ptr->next->next;
+                pmem::obj::delete_persistent<Segment<V> >(ptr->next);
+                ptr->next = temp;
+                return 1;
+            }
+            if(ptr->next != nullptr)
+            {
+                ptr = ptr->next;
+            }
+            else
+                break;
+        }
+        return -1;
     }
 
     V remove(int key, V value) {
