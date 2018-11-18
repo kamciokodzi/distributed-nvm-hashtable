@@ -99,12 +99,18 @@ public:
     //     throw "Not implemented yet!";
     // }
 
-//     void insert(int key, V value) {
-//         int segment = key & (INTERNAL_MAPS_COUNT-1);
+    void insert(int key, V value, int tid) {
+        int array = tid;
 
-//         std::unique_lock<pmem::obj::mutex> lock(segmentMutex[segment]);
+        std::unique_lock<pmem::obj::mutex> lock(segmentMutex[array]);
 
-//         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
+        pmem::obj::persistent_ptr<Segment<V> > ptr = arrayOfSegments[array];
+        if(ptr->segments[tid] != nullptr){
+            ptr->segments[tid]->key = key;
+            ptr->segments[tid]->value = value;
+        }
+
+
 //         bool update = false;
 //         while(true)
 //         {
@@ -128,9 +134,9 @@ public:
 // 	    });
 //         ptr->next->key = key;
 //         ptr->next->value = value;
-//   //          std::cout << "Inserted value to segment " << segment << std::endl;
-//         }
-//     }
+  //          std::cout << "Inserted value to segment " << segment << std::endl;
+        }
+    // }
 
 //     void insertNew(int key, V value) {
 //         int segment = key & (INTERNAL_MAPS_COUNT-1);
