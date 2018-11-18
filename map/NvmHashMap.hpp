@@ -144,7 +144,7 @@ public:
         }
     }
 
-    void expand(ArrayOfSegments<V> *array) {
+    void expand(pmem::obj::persistent_ptr<ArrayOfSegments<V> > *array) {
         std::cout<<array->size<<std::endl;
     }
 
