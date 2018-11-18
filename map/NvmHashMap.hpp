@@ -151,14 +151,17 @@ public:
     }
 
     void expand(int arrayIndex) {
-        size = this->arrayOfSegments[arrayIndex]->size ;
+        int size = this->arrayOfSegments[arrayIndex]->size ;
         std::cout<< size << std::endl;
 
         pmem::obj::persistent_ptr<ArrayOfSegments<V> > arrayOfSegments;
-        arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<V> >(2*size);
+        auto pop = pmem::obj::pool_by_vptr(this);
+        pmem::obj::transaction::run(pop, [&] {
+            arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<V> >(2*size);
+        });
 
         for(int i=0; i<size; i++) {
-            arrayOfSegments->segments[i] = this.arrayOfSegments[arrayIndex]->segments[i];
+            arrayOfSegments->segments[i] = this->arrayOfSegments[arrayIndex]->segments[i];
         }
         this->arrayOfSegments[arrayIndex] = arrayOfSegments;
     }
