@@ -24,6 +24,7 @@ public:
 template<class V>
 class SegmentObject {
 public:
+
     pmem::obj::p<V> value;
     pmem::obj::persistent_ptr<SegmentObject<V> > next = nullptr;
 };
@@ -33,7 +34,12 @@ class Segment {
 public:
     pmem::obj::p<int> key;
     pmem::obj::p<int> hash;
-    pmem::obj::persistent_ptr<SegmentObject<V> > next = nullptr;
+    pmem::obj::persistent_ptr<SegmentObject<V> > head = nullptr;
+
+    Segment()
+    {
+        head = pmem::obj::make_persistent< SegmentObject<V> >();
+    }
 };
 
 
@@ -106,21 +112,29 @@ public:
 
     void insert(int key, V value, int tid) {
         std::unique_lock <pmem::obj::mutex> lock(segmentMutex[tid]);
+
+        std::cout << key << value << tid;
+
         std::cout << "Thread: " << tid << ". Locked " << tid << std::endl;
 
         int index = key % this->arrayOfSegments[tid]->size;
         std::cout<<"Index: " << index << std::endl;
-        pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[tid]->segments[index]->next;
+        pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[tid]->segments[index]->head;
+        if (ptr != nullptr)
+        {
+            std::cout<<"Head.value = " << ptr->value << std::endl;
+        }
         std::cout << "Thread: " << tid << ". Log2" << std::endl;
-        while (true) {
+        while (true)
+        {
             std::cout << "Thread: " << tid << ". Log3" << std::endl;
-            if (ptr == nullptr) {
+            if (ptr->next == nullptr) {
                 std::cout << "Thread: " << tid << ". Inserting new SegmentObject" << std::endl;
                 auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
-                    ptr = pmem::obj::make_persistent<SegmentObject<V> >();
+                    ptr->next = pmem::obj::make_persistent<SegmentObject<V> >();
                 });
-                ptr->value = value;
+                ptr->next->value = value;
                 break;
             } else if (ptr->next != nullptr) {
                 std::cout << "Thread: " << tid << ". Jumping to the next segmentObject" << std::endl;

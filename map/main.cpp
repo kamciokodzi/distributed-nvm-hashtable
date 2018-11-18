@@ -23,7 +23,7 @@ pmem::obj::persistent_ptr<root> root_ptr;
  	std::cout << "Log iFT, tid=" << tid << std::endl;
 
  	for(int i = 10; i >= 0; i--) {
- 		root_ptr->pmap->insert(64*tid, 64*tid, tid);
+ 		root_ptr->pmap->insert(tid, tid, tid);
  	}
 // 	/root_ptr->pmap->iterate(tid);
  }
