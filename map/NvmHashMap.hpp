@@ -54,6 +54,12 @@ public:
             this->segments[i] = pmem::obj::make_persistent< Segment<V> >();
         }
     }
+    ArrayOfSegments(int size){
+        this->size = size;
+        for(int i=0; i<size; i++) {
+            this->segments[i] = pmem::obj::make_persistent< Segment<V> >();
+        }
+    }
 };
 
 template<typename V>
@@ -118,7 +124,7 @@ public:
         std::cout << "Thread: " << tid << ". Locked " << tid << std::endl;
 
         int index = key % this->arrayOfSegments[tid]->size;
-        expand(this->arrayOfSegments[tid]);
+        expand(tid);
         std::cout<<"Index: " << index << std::endl;
         pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[tid]->segments[index]->head;
         if (ptr != nullptr)
@@ -144,8 +150,14 @@ public:
         }
     }
 
-    void expand(pmem::obj::persistent_ptr<ArrayOfSegments<V> > *array) {
-        std::cout<<array->size<<std::endl;
+    void expand(int arrayIndex) {
+        std::cout<<this->arrayOfSegments[arrayIndex]->size << std::endl;
+
+        arrayOfSegments = pmem::obj::make_persistent< ArrayOfSegments<V> >(2*size);
+        for(int i=0; i<size; i++) {
+            arrayOfSegments->segments[i] = this.arrayOfSegments[arrayIndex]->segments[i];
+        }
+        this->arrayOfSegments[arrayIndex] = arrayOfSegments;
     }
 
 
