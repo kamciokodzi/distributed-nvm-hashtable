@@ -33,7 +33,7 @@ public:
 template<class V>
 class ArrayOfSegments {
 public:
-    pmem::obj::p<Segment<V>[] > segments;
+    pmem::obj::persistent_ptr<Segment<V> > segments[10];
 
     ArrayOfSegments() {
         for(int i=0; i<10; i++){
