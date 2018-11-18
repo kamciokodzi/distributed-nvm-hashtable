@@ -22,20 +22,28 @@ public:
 };
 
 template<class V>
+class SegmentObject {
+public:
+    pmem::obj::p<V> value;
+    pmem::obj::persistent_ptr<SegmentObject<V> > next = nullptr;
+};
+
+template<class V>
 class Segment {
 public:
     pmem::obj::p<int> key;
     pmem::obj::p<int> hash;
-    pmem::obj::p<V> value;
-    pmem::obj::persistent_ptr<Segment<V> > next = nullptr;
+    pmem::obj::persistent_ptr<SegmentObject<V> > next = nullptr;
 };
+
 
 template<class V>
 class ArrayOfSegments {
 public:
     pmem::obj::persistent_ptr<Segment<V> > segments[10];
-
+    pmem::obj::p<int> size;
     ArrayOfSegments() {
+        this->size = 10;
         for(int i=0; i<10; i++) {
             this->segments[i] = pmem::obj::make_persistent< Segment<V> >();
         }
@@ -45,10 +53,7 @@ public:
 template<typename V>
 class NvmHashMap {
 private:
-
     pmem::obj::persistent_ptr<ArrayOfSegments<V> > arrayOfSegments[INTERNAL_MAPS_COUNT];
-    // pmem::obj::persistent_ptr<Segment<V> > segments[INTERNAL_MAPS_COUNT];
-    // pmem::obj::persistent_ptr<Value<long> > mc[INTERNAL_MAPS_COUNT];
     pmem::obj::mutex segmentMutex[INTERNAL_MAPS_COUNT];
 
     size_t hash(int key) {
@@ -101,65 +106,29 @@ public:
 
     void insert(int key, V value, int tid) {
         std::unique_lock <pmem::obj::mutex> lock(segmentMutex[tid]);
-        std::cout << "Thead: " << tid << ". Locked " << tid << std::endl;
+        std::cout << "Thread: " << tid << ". Locked " << tid << std::endl;
 
-        pmem::obj::persistent_ptr <ArrayOfSegments<V>> ptr = arrayOfSegments[tid];
-
-        if (ptr->segments[tid] != nullptr) {
-
-            bool update = false;
-            while (true) {
-                if (ptr->segments[tid]->key == key) {
-                    ptr->segments[tid]->value = value;
-                    update = true;
-                    std::cout << "Thread: " << tid << ". Updated k: " << key << ", v: " << value << std::endl;
-                    break;
-                }
-                if (ptr->segments[tid]->next != nullptr) {
-                    ptr->segments[tid] = ptr->segments[tid]->next;
-                } else {
-                    break;
-                }
-            }
-
-            if (!update) {
+        int index = key % this->arrayOfSegments[tid]->size;
+        std::cout<<"Index: " << index << std::endl;
+        pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[tid]->segments[index]->next;
+        std::cout << "Thread: " << tid << ". Log2" << std::endl;
+        while (true) {
+            std::cout << "Thread: " << tid << ". Log3" << std::endl;
+            if (ptr == nullptr) {
+                std::cout << "Thread: " << tid << ". Inserting new SegmentObject" << std::endl;
                 auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
-                    ptr->segments[tid]->next = pmem::obj::make_persistent<Segment<V> >();
+                    ptr = pmem::obj::make_persistent<SegmentObject<V> >();
                 });
-                ptr->segments[tid]->next->key = key;
-                ptr->segments[tid]->next->value = value;
-
-                std::cout << "Thread: " << tid <<". Inserted k: " << key << ", v: " << value << std::endl;
+                ptr->value = value;
+                break;
+            } else if (ptr->next != nullptr) {
+                std::cout << "Thread: " << tid << ". Jumping to the next segmentObject" << std::endl;
+                ptr = ptr->next;
             }
-
-            std::cout << "Thread: " << tid << ". Finished inserting." << std::endl;
-
-//         bool update = false;
-//         while(true)
-//         {
-//             if(ptr->key == key)
-//             {
-//                 ptr->value = value;
-//                 update = true;
-//                 break;
-//             }
-//             if(ptr->next != nullptr)
-//                 ptr = ptr->next;
-//             else
-//                 break;
-//         }
-
-//         if(!update) {
-//             auto pop = pmem::obj::pool_by_vptr(this);
-//             pmem::obj::transaction::run(pop, [&] {
-//                 ptr->next = pmem::obj::make_persistent<Segment<V> >();
-// 	    });
-//         ptr->next->key = key;
-//         ptr->next->value = value;
-            //          std::cout << "Inserted value to segment " << segment << std::endl;
         }
     }
+
 
 //     void insertNew(int key, V value) {
 //         int segment = key & (INTERNAL_MAPS_COUNT-1);
@@ -190,30 +159,54 @@ public:
 //             ptr->next->key = key;
 //             ptr->next->value = value;
 //             std::cout << "Inserted value to segment " << segment << std::endl;
-//         }
-//     }
-
-//     V get(int key) {
-//         int segment = key & (INTERNAL_MAPS_COUNT-1);
-//         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
-//         while(true)
-//         {
-//             if(ptr->key == key)
-//             {
-//                 std::cout << "Found element with key " << key << " in segment " << segment << ". Its value = " << ptr->value << std::endl;
-//                 return ptr->value;
+////         }
+////     }
+//
+//     V get(int key, int tid) {
+//
+//         //std::cout << "Thread: " << tid << ". Locked " << std::endl;
+//
+//         pmem::obj::persistent_ptr <ArrayOfSegments<V>> ptr = arrayOfSegments[tid];
+//
+//         if (ptr -> segments[tid] != nullptr) {
+//
+//             while (true) {
+//                 if (ptr->segments[tid]->key == key) {
+//                     int value = ptr->segments[tid]->value;
+//                     std::cout << "Thread: " << tid << ". Found element with key: " << key << ". Value: " << value << std::endl;
+//                     return value;
+//                 }
+//                 if (ptr->segments[tid]->next != nullptr) {
+//                     ptr->segments[tid] = ptr->segments[tid]->next;
+//                 } else {
+//                     break;
+//                 }
 //             }
-//             if(ptr->next != nullptr)
-//                 ptr = ptr->next;
-//             else
-//                 break;
+//             std::cout << "Thread: " << tid << ". Element with key: " << key << " was not found." << std::endl;
 //         }
-//         std::cout << "Element not found" << std::endl;
 //         return -1;
 //     }
-
-//     int remove(int key) {
-//         int segment = key & (INTERNAL_MAPS_COUNT -1);
+//
+//     V iterate(int tid) {
+//         pmem::obj::persistent_ptr <ArrayOfSegments<V>> ptr = arrayOfSegments[tid];
+//
+//         if (ptr -> segments[tid] != nullptr) {
+//
+//             while (true) {
+//                 if (ptr->segments[tid]->next != nullptr) {
+//                     ptr->segments[tid] = ptr->segments[tid]->next;
+//                     std::cout << ptr->segments[tid]->value;
+//                 } else {
+//                     std::cout << std::endl;
+//                     break;
+//                 }
+//             }
+//         }
+//         return -1;
+//     }
+//
+////     int remove(int key) {
+////         int segment = key & (INTERNAL_MAPS_COUNT -1);
 //         pmem::obj::persistent_ptr<Segment<V> > ptr = segments[segment];
 //         while(true)
 //         {
