@@ -40,7 +40,7 @@ public:
             this->segments[i] = pmem::obj::make_persistent< Segment<V> >();
         }
     }
-}
+};
 
 template<typename V>
 class NvmHashMap {

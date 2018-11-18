@@ -18,14 +18,14 @@ bool file_exists(const char *fname) {
 
 pmem::obj::persistent_ptr<root> root_ptr;
 
-void insertFromThread(int tid)
-{
-	std::cout << "Log iFT, tid=" << tid << std::endl;
+// void insertFromThread(int tid)
+// {
+// 	std::cout << "Log iFT, tid=" << tid << std::endl;
 
-	for(int i = 10; i >= 0; i--) {
-		root_ptr->pmap->insert(i+64*tid, i+64*tid);
-	}
-}
+// 	for(int i = 10; i >= 0; i--) {
+// 		root_ptr->pmap->insert(i+64*tid, i+64*tid);
+// 	}
+// }
 
 int main(int argc, char *argv[]) {
 
