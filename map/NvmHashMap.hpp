@@ -118,6 +118,7 @@ public:
         std::cout << "Thread: " << tid << ". Locked " << tid << std::endl;
 
         int index = key % this->arrayOfSegments[tid]->size;
+        expand(this->arrayOfSegments[tid]);
         std::cout<<"Index: " << index << std::endl;
         pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[tid]->segments[index]->head;
         if (ptr != nullptr)
@@ -141,6 +142,10 @@ public:
                 ptr = ptr->next;
             }
         }
+    }
+
+    void expand(ArrayOfSegments<V> *array) {
+        std::cout<<array->size<<std::endl;
     }
 
 
