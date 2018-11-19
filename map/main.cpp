@@ -22,7 +22,7 @@ pmem::obj::persistent_ptr<root> root_ptr;
  {
  	std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 3; i >= 0; i--) {
+ 	for(int i = 100; i >= 0; i--) {
  		root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
  	}
  	//root_ptr->pmap->iterate(tid);
@@ -32,7 +32,7 @@ void getFromThread(int tid)
 {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 3; i >= 0; i--) {
+    for(int i = 1000; i >= 0; i--) {
         root_ptr->pmap->get(i+64*tid);
     }
 }
@@ -71,27 +71,30 @@ int main(int argc, char *argv[]) {
         });
         std::cout << "Log 5a"<<std::endl;
     }
-    // auto start = std::chrono::system_clock::now();
+     auto start = std::chrono::system_clock::now();
      if (insertMode) {
          if (mode == "multithread") {
              std::thread t1(insertFromThread, 0);
-             std::thread t2(insertFromThread, 1);
-             std::thread t3(insertFromThread, 2);
-             std::thread t4(insertFromThread, 3);
-             std::thread t5(insertFromThread, 4);
-             std::thread t6(insertFromThread, 5);
-             std::thread t7(insertFromThread, 6);
-             std::thread t8(insertFromThread, 7);
-             std::cout << "Inserting values to array" << std::endl;
+//             std::thread t2(insertFromThread, 1);
+//             std::thread t3(insertFromThread, 2);
+//             std::thread t4(insertFromThread, 3);
+//             std::thread t5(insertFromThread, 4);
+//             std::thread t6(insertFromThread, 5);
+//             std::thread t7(insertFromThread, 6);
+//             std::thread t8(insertFromThread, 7);
+//             std::cout << "Inserting values to array" << std::endl;
              t1.join();
-             t2.join();
-             t3.join();
-             t4.join();
-             t5.join();
-             t6.join();
-             t7.join();
-             t8.join();
+//             t2.join();
+//             t3.join();
+//             t4.join();
+//             t5.join();
+//             t6.join();
+//             t7.join();
+//             t8.join();
          }
+         auto end = std::chrono::system_clock::now();
+         std::chrono::duration<double> elapsed_time = end-start;
+         std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
      } else {
          std::cout << "Getting values from array" << std::endl;
          std::thread t1(getFromThread, 0);
@@ -110,6 +113,10 @@ int main(int argc, char *argv[]) {
          t6.join();
          t7.join();
          t8.join();
+         auto end = std::chrono::system_clock::now();
+         std::chrono::duration<double> elapsed_time = end-start;
+         std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
+
      }
 
 // else {
@@ -122,9 +129,6 @@ int main(int argc, char *argv[]) {
 //         }
 
 
-    // auto end = std::chrono::system_clock::now();
-    // std::chrono::duration<double> elapsed_time = end-start;
-    // std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
     // for (int i = 0; i < 1024; i++) {
 	// std::cout << "Remove index " << i << std::endl;
 	// root_ptr->pmap->remove(i);
