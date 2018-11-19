@@ -22,10 +22,11 @@ pmem::obj::persistent_ptr<root> root_ptr;
  {
  	std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 10; i >= 0; i--) {
+ 	for(int i = 1; i >= 0; i--) {
  		root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
+ 		//root_ptr->pmap->remove(i+64*tid);
+ 		//root_ptr->pmap->get(i+64*tid);
  	}
- 	//root_ptr->pmap->iterate(tid);
  }
 
 void getFromThread(int tid)

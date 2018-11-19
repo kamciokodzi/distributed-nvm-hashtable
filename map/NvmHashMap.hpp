@@ -38,6 +38,7 @@ public:
     Segment()
     {
         head = pmem::obj::make_persistent< SegmentObject<V> >();
+        head -> value = -1; // todo
     }
 };
 
@@ -91,12 +92,13 @@ public:
         arrayOfSegments[index]->segments[index2]->hash = hash;
         pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[index]->segments[index2]->head;
         while (true) {
-            if (ptr == nullptr) {
+            if (ptr -> value = -1) {
                 std::cout<<"First element! Empty list" << std::endl;
             }
             if (ptr->next == nullptr) { // it's the last item of the list
                 if (ptr->key == key) {
-                    std::cout << "Found element with the same key. Inserting new element aborted" << std::endl;
+                    std::cout << "Found element with the same key. Updating element" << std::endl;
+                    ptr->value = value;
                     break;
                 }
                 std::cout << "Inserting new SegmentObject" << std::endl;
@@ -112,7 +114,8 @@ public:
                 ptr = ptr->next;
                 std::cout << "Ptr->key = " << ptr->key << std::endl;
                 if (ptr->key == key) {
-                    std::cout << "Found element with the same key. Inserting new element aborted" << std::endl;
+                    std::cout << "Found element with the same key. Updating element" << std::endl;
+                    ptr->value = value;
                     break;
                 }
             }
@@ -152,64 +155,42 @@ public:
         return -1;
     }
 
-//    int remove(int key) {
-//        int index = key & INTERNAL_MAPS_COUNT - 1;
-//        int index2 = key % arrayOfSegments[index]->size;
-//        std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
-//        pmem::obj::persistent_ptr <SegmentObject<V>> ptr = arrayOfSegments[index]->segments[index2]->head;
-//        int hash = 2 * key;
-//
-//        std::cout << "Key = " << key << ". Hash: " << hash << std::endl;
-//
-//        while (true) {
-//            if (ptr == nullptr) {
-//                std::cout << "Empty list. Element not found." << std::endl;
-//                break;
-//            } else {
-//                if (ptr->next != nullptr) { // at least 2 elements in list
-//                    if (ptr->hash == hash) {
-//                        auto pop = pmem::obj::pool_by_vptr(this);
-//                        pmem::obj::transaction::run(pop, [&] {
-//                            pmem::obj::delete_persistent<SegmentObject<V> >(ptr);
-//                        });
-//                    }
-//                    if (ptr->next->hash == hash) {
-//
-//                    }
-//                } else { //1 element list
-//                    if (ptr->hash == hash) {
-//                        auto pop = pmem::obj::pool_by_vptr(this);
-//                        pmem::obj::transaction::run(pop, [&] {
-//                            pmem::obj::delete_persistent<SegmentObject<V> >(ptr);
-//                        });
-//                    }
-//                }
-//
-//                    if (ptr->next->hash == hash) {
-//                    std::cout << "Found element with hash = " << hash << ". Value = " << ptr->value << std::endl;
-//                    if (ptr->next != nullptr) {
-//                        ptr=
-//                    } else {
-//
-//                    }
-//                    pmem::obj::transaction::run(pop, [&] {
-//                        pmem::obj::delete_persistent<SegmentObject<V> >(ptr);
-//                    });
-//                    return ptr->value;
-//                } else {
-//                    if (ptr->next != nullptr) {
-//                        std::cout << "Hash = " << ptr->hash << ". Value = " << ptr->value << std::endl;
-//                        std::cout << "Jumping to the next segmentObject" << std::endl;
-//                        ptr = ptr->next;
-//                    } else { //end of the list
-//                        std::cout << "Element not found." << std::endl;
-//                        break;
-//                    }
-//                }
-//            }
-//        }
-//    }
+    void remove (int key) {
+        int hash = 2 * key;
+        int index = hash & INTERNAL_MAPS_COUNT - 1;
+        int index2 = hash % arrayOfSegments[index]->size;
+        std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
+        pmem::obj::persistent_ptr <SegmentObject<V>> ptr = arrayOfSegments[index]->segments[index2]->head;
 
+        std::cout << "Key = " << key << ". Hash: " << hash << std::endl;
+
+        while (true) {
+            if (ptr->next != nullptr && ptr->next->key == key) {
+                std::cout << "Found element with key = " << key << ". Value = " << ptr->value << std::endl;
+                auto temp = ptr->next->next;
+                auto pop = pmem::obj::pool_by_vptr(this);
+                pmem::obj::transaction::run(pop, [&] {
+                    pmem::obj::delete_persistent<SegmentObject<V> >(ptr->next);
+                    ptr->next = temp;
+                });
+                std::cout << "Removed element with key = " << key << std::endl;
+            } else if (ptr->next == nullptr && ptr->key == key) {
+                std::cout << "One-element list. Found element with key = " << key << std::endl;
+                auto pop = pmem::obj::pool_by_vptr(this);
+                pmem::obj::transaction::run(pop, [&] {
+                    pmem::obj::delete_persistent<SegmentObject<V> >(ptr->next);
+                });
+                std::cout << "Removed element with key = " << key << std::endl;
+            }
+            if(ptr->next != nullptr) {
+                ptr = ptr->next;
+            }
+            else {
+                break;
+            }
+        }
+
+    }
 
     // int calcSize(int triesToBlock = 5) {
     //     int size = 0;
