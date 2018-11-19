@@ -25,14 +25,14 @@ template<class V>
 class SegmentObject {
 public:
     pmem::obj::p<V> value;
-    pmem::obj::p<int> hash;
+    pmem::obj::p<int> key;
     pmem::obj::persistent_ptr<SegmentObject<V> > next = nullptr;
 };
 
 template<class V>
 class Segment {
 public:
-    pmem::obj::p<int> key;
+    pmem::obj::p<int> hash;
     pmem::obj::persistent_ptr<SegmentObject<V> > head = nullptr;
 
     Segment()
@@ -80,36 +80,39 @@ public:
 
 
     void insertNew(int key, V value) {
-        int index = key & INTERNAL_MAPS_COUNT - 1;
-        std::unique_lock <pmem::obj::mutex> lock(arrayOfSegmentsMutex[index]);
         int hash = 2 * key;
+        int index = hash & INTERNAL_MAPS_COUNT - 1;
+        std::unique_lock <pmem::obj::mutex> lock(arrayOfSegmentsMutex[index]);
 
-//        std::cout << "Locked. Key = " << key << ". Hash: " << hash << ". Value = " << value << std::endl;
+        std::cout << "Locked. Key = " << key << ". Hash: " << hash << ". Value = " << value << std::endl;
 
-        int index2 = key % arrayOfSegments[index]->size;
-        //std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
-        arrayOfSegments[index]->segments[index2]->key = key;
+        int index2 = hash % arrayOfSegments[index]->size;
+        std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
+        arrayOfSegments[index]->segments[index2]->hash = hash;
         pmem::obj::persistent_ptr <SegmentObject<V> > ptr = arrayOfSegments[index]->segments[index2]->head;
         while (true) {
+            if (ptr == nullptr) {
+                std::cout<<"First element! Empty list" << std::endl;
+            }
             if (ptr->next == nullptr) { // it's the last item of the list
-                if (ptr->hash == hash) {
-//                    std::cout << "Found element with the same hash. Inserting new element aborted" << std::endl;
+                if (ptr->key == key) {
+                    std::cout << "Found element with the same key. Inserting new element aborted" << std::endl;
                     break;
                 }
-//                std::cout << "Inserting new SegmentObject" << std::endl;
+                std::cout << "Inserting new SegmentObject" << std::endl;
                 auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
                     ptr->next = pmem::obj::make_persistent<SegmentObject<V> >();
-                    ptr->next->hash = hash;
+                    ptr->next->key = key;
                     ptr->next->value = value;
                 });
                 break;
             } else {
-//                std::cout << "Jumping to the next segmentObject" << std::endl;
+                std::cout << "Jumping to the next segmentObject" << std::endl;
                 ptr = ptr->next;
-//                std::cout << "Ptr->hash = " << ptr->hash << std::endl;
-                if (ptr->hash == hash) {
-//                    std::cout << "Found element with the same hash. Inserting new element aborted" << std::endl;
+                std::cout << "Ptr->key = " << ptr->key << std::endl;
+                if (ptr->key == key) {
+                    std::cout << "Found element with the same key. Inserting new element aborted" << std::endl;
                     break;
                 }
             }
@@ -117,29 +120,29 @@ public:
     }
 
     V get(int key) {
-        int index = key & INTERNAL_MAPS_COUNT - 1;
-        int index2 = key % arrayOfSegments[index]->size;
-//        std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
-        pmem::obj::persistent_ptr <SegmentObject<V>> ptr = arrayOfSegments[index]->segments[index2]->head;
         int hash = 2 * key;
+        int index = hash & INTERNAL_MAPS_COUNT - 1;
+        int index2 = hash % arrayOfSegments[index]->size;
+        std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
+        pmem::obj::persistent_ptr <SegmentObject<V>> ptr = arrayOfSegments[index]->segments[index2]->head;
 
-//        std::cout << "Key = " << key << ". Hash: " << hash << std::endl;
+        std::cout << "Key = " << key << ". Hash: " << hash << std::endl;
 
         while (true) {
             if (ptr == nullptr) {
-//                std::cout << "Empty list. Element not found." << std::endl;
+                std::cout << "Empty list. Element not found." << std::endl;
                 break;
             } else {
-                if (ptr->hash == hash) {
-//                    std::cout << "Found element with hash = " << hash << ". Value = " << ptr->value << std::endl;
+                if (ptr->key == key) {
+                    std::cout << "Found element with key = " << key << ". Value = " << ptr->value << std::endl;
                     return ptr->value;
                 } else {
                     if (ptr->next != nullptr) {
-//                        std::cout << "Hash = " << ptr->hash << ". Value = " << ptr->value << std::endl;
-//                        std::cout << "Jumping to the next segmentObject" << std::endl;
+                        std::cout << "Key = " << ptr->key << ". Value = " << ptr->value << std::endl;
+                        std::cout << "Jumping to the next segmentObject" << std::endl;
                         ptr = ptr->next;
                     } else { //end of the list
-//                        std::cout << "Element not found." << std::endl;
+                        std::cout << "Element not found." << std::endl;
                         break;
                     }
                 }
