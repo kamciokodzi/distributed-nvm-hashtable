@@ -55,6 +55,7 @@ public:
         }
     }
     ArrayOfSegments(int arraySize){
+        std::cout<< " HAHA " << arraySize << std::endl;
         this->arraySize = arraySize;
         for(int i=0; i<arraySize; i++) {
             this->segments[i] = pmem::obj::make_persistent< Segment<V> >();
@@ -93,8 +94,8 @@ public:
         int index2 = key % arrayOfSegments[index]->arraySize;
 
         if(this->needResize(index2)) {
-            std::cout<< "PRZYDALBY SIE EXPAND" << std::endl;
-//            expand(index2);
+            std::cout<< "PRZYDALBY SIE EXPAND arrayIndex " << index2 << std::endl;
+            expand(index2);
         }
 
         arrayOfSegments[index]->segments[index2]->key = key;
@@ -149,20 +150,24 @@ public:
 
     void expand(int arrayIndex) {
         int size = this->arrayOfSegments[arrayIndex]->arraySize ;
-        std::cout<< size << std::endl;
 
         pmem::obj::persistent_ptr<ArrayOfSegments<V> > arrayOfSegments;
         auto pop = pmem::obj::pool_by_vptr(this);
         pmem::obj::transaction::run(pop, [&] {
             arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<V> >(2*size);
         });
+        std::cout<< "NEW SIZE " << arrayOfSegments->arraySize << std::endl;
+
 
         for(int i=0; i<size; i++) {
             arrayOfSegments->segments[i] = this->arrayOfSegments[arrayIndex]->segments[i];
-	    std::cout<<"original key: " << this->arrayOfSegments[arrayIndex]->segments[i]->key<<std::endl;
-	    std::cout<<"copied key: " << arrayOfSegments->segments[i]->key <<std::endl;
+	        std::cout<<"original key: " << this->arrayOfSegments[arrayIndex]->segments[i]->key<<std::endl;
+	        std::cout<<"copied key: " << arrayOfSegments->segments[i]->key <<std::endl;
+
         }
+        std::cout << "HEHEHE" << std::endl;
         this->arrayOfSegments[arrayIndex] = arrayOfSegments;
+        std::cout<< "NO I GUNWO " << std::endl;
     }
 
     int getMapSize() {

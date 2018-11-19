@@ -32,7 +32,7 @@ void getFromThread(int tid)
 {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 1000; i >= 0; i--) {
+    for(int i = 100; i >= 0; i--) {
         root_ptr->pmap->get(i+64*tid);
     }
 }
