@@ -4,7 +4,7 @@
 #include <ctime>
 
 struct root {
-    pmem::obj::persistent_ptr<NvmHashMap<int> > pmap;
+    pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
 };
 
 bool file_exists(const char *fname) {
@@ -22,9 +22,9 @@ pmem::obj::persistent_ptr<root> root_ptr;
  {
  	std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 10; i >= 0; i--) {
- 		root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
- 		root_ptr->pmap->get(i+64*tid);
+ 	for(int i = 100; i >= 0; i--) {
+// 		root_ptr->pmap->insertNew(std::to_string(i+64*tid), i+64*tid);
+        root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
     }
  }
 
@@ -32,7 +32,8 @@ void getFromThread(int tid)
 {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 10; i >= 0; i--) {
+    for(int i = 100; i >= 0; i--) {
+//        root_ptr->pmap->get(std::to_string(i+64*tid));
         root_ptr->pmap->get(i+64*tid);
     }
 }
@@ -59,17 +60,13 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    std::cout << "Log 3"<<std::endl;
     root_ptr = pop.root();
 
-    std::cout << "Log 4"<<std::endl;
     if (!root_ptr->pmap) {
         pmem::obj::transaction::run(pop, [&] {
-
-            std::cout << "Log 4a"<<std::endl;
-            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int> >();
+            std::cout << "Creating NvmHashMap"<<std::endl;
+            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >();
         });
-        std::cout << "Log 5a"<<std::endl;
     }
      auto start = std::chrono::system_clock::now();
      if (insertMode) {
