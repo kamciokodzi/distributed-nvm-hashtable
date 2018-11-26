@@ -4,6 +4,7 @@
 #include <ctime>
 
 struct root {
+//    pmem::obj::persistent_ptr<NvmHashMap<int, std::string> > pmap;
     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
 };
 
@@ -65,6 +66,7 @@ int main(int argc, char *argv[]) {
     if (!root_ptr->pmap) {
         pmem::obj::transaction::run(pop, [&] {
             std::cout << "Creating NvmHashMap"<<std::endl;
+//            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, std::string> >();
             root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >();
         });
     }
