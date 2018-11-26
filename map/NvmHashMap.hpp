@@ -108,6 +108,7 @@ public:
                     ptr->key = key;
                     ptr->value = value;
                     ptr->next = pmem::obj::make_persistent<SegmentObject<V> >();
+                    arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size + 1;
                 });
                 break;
             }
@@ -264,6 +265,7 @@ public:
                     pmem::obj::transaction::run(pop, [&] {
                         pmem::obj::delete_persistent<SegmentObject<V> >(ptr->next);
                         ptr->next = temp;
+                        arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size - 1;
                     });
                     std::cout << "Removed element with key = " << key << std::endl;
                     break;
@@ -272,6 +274,7 @@ public:
                     pmem::obj::transaction::run(pop, [&] {
                         arrayOfSegments[index]->segments[index2].head = ptr->next;
                         pmem::obj::delete_persistent<SegmentObject<V> >(ptr);
+                        arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size - 1;
                     });
                     std::cout << "Removed element with key = " << key << std::endl;
                     break;
