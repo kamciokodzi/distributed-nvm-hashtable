@@ -53,17 +53,11 @@ public:
     ArrayOfSegments() {
         this->segments = pmem::obj::make_persistent<Segment<V>[]>(10);
         this->size = 10;
-        for(int i=0; i<this->size; i++) {
-            //this->segments[i] = pmem::obj::make_persistent<Segment<V> >();
-        }
     }
     ArrayOfSegments(int size){
         std::cout<< " HAHA " << size << std::endl;
         this->segments = pmem::obj::make_persistent<Segment<V>[]>(size);
         this->size = size;
-        for(int i=0; i<size; i++) {
-            //this->segments[i] = pmem::obj::make_persistent<Segment<V> >();
-        }
     }
 };
 
@@ -183,19 +177,19 @@ public:
         auto pop = pmem::obj::pool_by_vptr(this);
         pmem::obj::transaction::run(pop, [&] {
             arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<V> >(2*size);
-        });
+        
         std::cout<< "NEW SIZE " << arrayOfSegments->size << std::endl;
 
 
         for(int i=0; i<size; i++) {
             arrayOfSegments->segments[i] = this->arrayOfSegments[arrayIndex]->segments[i];
-	        std::cout<<"original key: " << this->arrayOfSegments[arrayIndex]->segments[i].hash<<std::endl;
-	        std::cout<<"copied key: " << arrayOfSegments->segments[i].hash <<std::endl;
+	        std::cout<<"original hash: " << this->arrayOfSegments[arrayIndex]->segments[i].hash<<std::endl;
+	        std::cout<<"copied hash: " << arrayOfSegments->segments[i].hash <<std::endl;
 
         }
-        std::cout << "HEHEHE" << std::endl;
+        pmem::obj::delete_persistent<ArrayOfSegments<V> >(this->arrayOfSegments[arrayIndex]);
         this->arrayOfSegments[arrayIndex] = arrayOfSegments;
-        std::cout<< "NO I GUNWO " << std::endl;
+        });
     }
 
     int getMapSize() {
@@ -203,7 +197,7 @@ public:
 
         for(int i =0; i<INTERNAL_MAPS_COUNT; i++) {
             for (int j = 0; j < this->arrayOfSegments[i]->size; j++) {
-                size += this->arrayOfSegments[i]->segments[j]->size;
+                size += this->arrayOfSegments[i]->segments[j].size;
             }
         }
 
