@@ -42,10 +42,6 @@ public:
     pmem::obj::p<int> hash;
     pmem::obj::p<int> size = 0;
     pmem::obj::persistent_ptr<SegmentObject<K, V> > head = nullptr;
-
-    Segment() {
-        head = pmem::obj::make_persistent< SegmentObject<K, V> >();
-    }
 };
 
 
@@ -109,14 +105,26 @@ public:
         pmem::obj::persistent_ptr <SegmentObject<K, V> > ptr = arrayOfSegments[index]->segments[index2].head;
         
         while (true) {
-            std::cout<<ptr->value<<std::endl;
-            if (ptr->next == nullptr) { // it's the last item of the list
+            //std::cout<<ptr->value<<std::endl;
+            if (ptr == nullptr) { // empty list
                 std::cout << "Inserting new SegmentObject with key = " << key << " and value = " << value << std::endl;
                 auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
+                    ptr = pmem::obj::make_persistent<SegmentObject<K, V> >();
                     ptr->key = key;
                     ptr->value = value;
+                    arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size + 1;
+                    arrayOfSegments[index]->segments[index2].head = ptr;
+                });
+                break;
+            }
+            if (ptr->next == nullptr) { // it's the last item of the list
+                std::cout << "Inserting new SegmentObject with key = " << key << " and value = " << value << std::endl;
+                auto pop = pmem::obj::pool_by_vptr(this);
+                pmem::obj::transaction::run(pop, [&] {                    
                     ptr->next = pmem::obj::make_persistent<SegmentObject<K, V> >();
+                    ptr->next->key = key;
+                    ptr->next->value = value;
                     arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size + 1;
                 });
                 break;
@@ -124,14 +132,6 @@ public:
             if (ptr->key.get_rw() == key) {
 //                std::cout << "Found element with the same key. Updating element" << std::endl;
                 ptr->value = value;
-                if (ptr->next == nullptr) { // it's the last item of the list
-//                    std::cout << "Inserting new empty SegmentObject" << std::endl;
-                    auto pop = pmem::obj::pool_by_vptr(this);
-                    pmem::obj::transaction::run(pop, [&] {
-                        ptr->next = pmem::obj::make_persistent<SegmentObject<K, V> >();
-                    });
-                    break;
-                }
                 break;
             }
 
@@ -154,19 +154,13 @@ public:
         std::cout << "Index1 = " << index << ". Index2 = " << index2 << std::endl;
 
         while (true) {
-            if (ptr->next == nullptr) {
+            if (ptr == nullptr) {
                 std::cout << "Did not found element with key = " << key << std::endl;
                 break;
             } else {
                 if (ptr->key.get_ro()  == key) {
                     std::cout << "Found element with key = " << key << ". Value = " << ptr->value << std::endl;
                     return ptr->value;
-                } else if (ptr->next->next == nullptr) {
-                    std::cout << "Did not found element with key = " << key << std::endl;
-                    break;
-                } else if (ptr->next->key.get_ro()  == key) {
-                    std::cout << "Found element with key = " << key << ". Value = " << ptr->next->value << std::endl;
-                    return ptr->next->value;
                 }
             }
             if (ptr->next != nullptr) {
@@ -195,52 +189,32 @@ public:
             pmem::obj::persistent_ptr <SegmentObject<K, V> > ptr;
             pmem::obj::persistent_ptr <SegmentObject<K, V> > tmp;
             
-            for(int i=0; i<arraySize; i++) {
-                ptr = this->arrayOfSegments[arrayIndex]->segments[i].head;
-                if (ptr->next != nullptr) {
+            for(int i=0; i<arraySize; i++) {                
+                while (true) {
+                    ptr = this->arrayOfSegments[arrayIndex]->segments[i].head;
+                    if (ptr == nullptr) {
+                        break;
+                    }
                     this->arrayOfSegments[arrayIndex]->segments[i].head = ptr->next;
                     ptr->next = nullptr;
-                }
-                else {
-                    this->arrayOfSegments[arrayIndex]->segments[i].head = nullptr;
-                }
-                while (true) {
+                    
                     hash = this->hash(ptr->key);
                     index2 = hash % arrayOfSegments->arraySize;
                     std::cout<<"Old index: "<<hash % arraySize<<" New index: "<<index2<<std::endl;
                     tmp = arrayOfSegments->segments[index2].head;
                     if (tmp == nullptr) {
                         arrayOfSegments->segments[index2].head = ptr;
-                        break;
                     } else {
                         while (true) {
                             if (tmp->next == nullptr) {
                                 tmp->next = ptr;
                                 break;
-                            }
-                            if (tmp->next != nullptr) {
-                            tmp = tmp->next;
                             } else {
-                                break;
+                                tmp = tmp->next;
                             }
                         }
-                    }
-                    if (this->arrayOfSegments[arrayIndex]->segments[i].head != nullptr) {
-                        ptr = this->arrayOfSegments[arrayIndex]->segments[i].head;
-                        if (ptr->next != nullptr) {
-                            this->arrayOfSegments[arrayIndex]->segments[i].head = ptr->next;
-                            ptr->next = nullptr;
-                        } else {
-                            this->arrayOfSegments[arrayIndex]->segments[i].head = nullptr;
-                        }
-                    } else {
-                        break;
-                    }
-                    
+                    }                    
                 }
-            }
-            for(int i=0; i<arrayOfSegments->arraySize; i++) {
-                std::cout<<arrayOfSegments->segments[i].head->value<<std::endl;
             }
             pmem::obj::delete_persistent<ArrayOfSegments<K, V> >(this->arrayOfSegments[arrayIndex]);
             this->arrayOfSegments[arrayIndex] = arrayOfSegments;
@@ -287,9 +261,9 @@ public:
 
         std::cout<< "No of collided el. " << numberOfCollidedElements << std::endl;
         std::cout<< "No of el. " << numberOfElements << std::endl;
-        std::cout<<"Ten no stosunek " << (float)numberOfCollidedElements/(float)numberOfElements << std::endl;
+        std::cout<<"Ratio " << (float)numberOfCollidedElements/(float)numberOfElements << std::endl;
 
-        if((float)numberOfCollidedElements/(float)numberOfElements >= 0.5) {
+        if((float)numberOfCollidedElements/(float)numberOfElements >= 0.75) {
             return true;
         }
 
