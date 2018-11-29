@@ -280,21 +280,11 @@ public:
         std::cout << "Key = " << key << ". Hash: " << hash << std::endl;
 
         while (true) {
-            if (ptr->next == nullptr) {
+            if (ptr == nullptr) {
                 std::cout << "Did not found element with key = " << key << std::endl;
                 break;
             } else {
-                if (ptr->next->key.get_rw()  == key) {
-                    auto temp = ptr->next->next;
-                    auto pop = pmem::obj::pool_by_vptr(this);
-                    pmem::obj::transaction::run(pop, [&] {
-                        pmem::obj::delete_persistent<SegmentObject<K, V> >(ptr->next);
-                        ptr->next = temp;
-                        arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size - 1;
-                    });
-                    std::cout << "Removed element with key = " << key << std::endl;
-                    break;
-                } else if (ptr->key.get_rw()  == key) {
+                 if (ptr->key.get_rw()  == key) {
                     auto pop = pmem::obj::pool_by_vptr(this);
                     pmem::obj::transaction::run(pop, [&] {
                         arrayOfSegments[index]->segments[index2].head = ptr->next;
@@ -306,6 +296,17 @@ public:
                 }
             }
             if (ptr->next != nullptr) {
+                if (ptr->next->key.get_rw()  == key) {
+                    auto temp = ptr->next->next;
+                    auto pop = pmem::obj::pool_by_vptr(this);
+                    pmem::obj::transaction::run(pop, [&] {
+                        pmem::obj::delete_persistent<SegmentObject<K, V> >(ptr->next);
+                        ptr->next = temp;
+                        arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size - 1;
+                    });
+                    std::cout << "Removed element with key = " << key << std::endl;
+                    break;
+                }
                 ptr = ptr->next;
             } else {
                 std::cout << "Did not found element with key = " << key << std::endl;
