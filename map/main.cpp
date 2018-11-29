@@ -24,9 +24,9 @@ pmem::obj::persistent_ptr<root> root_ptr;
  	std::cout << "Log iFT, tid=" << tid << std::endl;
 
  	for(int i = 100; i >= 0; i--) {
-// 		root_ptr->pmap->insertNew(std::to_string(i+64*tid), i+64*tid);
-        root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
-    }
+
+ 		root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
+ 	}
  }
 
 void getFromThread(int tid)
@@ -34,7 +34,6 @@ void getFromThread(int tid)
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
     for(int i = 100; i >= 0; i--) {
-//        root_ptr->pmap->get(std::to_string(i+64*tid));
         root_ptr->pmap->get(i+64*tid);
     }
 }
@@ -81,7 +80,9 @@ int main(int argc, char *argv[]) {
 //             std::thread t6(insertFromThread, 5);
 //             std::thread t7(insertFromThread, 6);
 //             std::thread t8(insertFromThread, 7);
+
              std::cout << "Inserting values to array" << std::endl;
+
              t1.join();
 //             t2.join();
 //             t3.join();
