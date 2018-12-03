@@ -45,6 +45,7 @@ int main(int argc, char *argv[]) {
     std::string mode = argv[2];
     bool insertMode = false;
 
+    std::cout << "path: " << path.c_str() << std::endl;
     try {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool"<<std::endl;
@@ -118,22 +119,4 @@ int main(int argc, char *argv[]) {
          std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
 
      }
-
-// else {
-//	 	std::cout << "Inserting values into array" << std::endl;
-//	 	for(int i = 16000000; i >= 0; i--)
-//	 	{
-//	 		if(i % 10000 == 0) std::cout << i << std::endl;
-//	 		root_ptr->pmap->insert(i, i);
-//	 	}
-//         }
-
-
-    // for (int i = 0; i < 1024; i++) {
-	// std::cout << "Remove index " << i << std::endl;
-	// root_ptr->pmap->remove(i);
-    //     root_ptr->pmap->get(i);
-    // }
-
-    // std::cout << "Log 6"<<std::endl;
 }
