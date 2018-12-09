@@ -93,7 +93,7 @@ public:
 //        std::cout << "Locked. Key = " << key << ". Hash = " << hash << ". Value = " << value << std::endl;
 
         if(this->needResize(index)) {
-            std::cout<< "Expanding array of index: " << index << std::endl;
+//            std::cout<< "Expanding array of index: " << index << std::endl;
             expand(index);
         }
         
@@ -170,7 +170,7 @@ public:
                 break;
             }
         }
-        return -1;
+        return (V) 0;
     }
 
     void expand(int arrayIndex) {
@@ -314,7 +314,7 @@ public:
                 break;
             }
         }
-        return -1;
+        return (V) 0;
     }
 };
 

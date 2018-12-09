@@ -5,7 +5,7 @@
 
 struct root {
 //    pmem::obj::persistent_ptr<NvmHashMap<int, std::string> > pmap;
-    pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
+    pmem::obj::persistent_ptr <NvmHashMap<int, int>> pmap;
 };
 
 bool file_exists(const char *fname) {
@@ -17,43 +17,42 @@ bool file_exists(const char *fname) {
     return false;
 }
 
-pmem::obj::persistent_ptr<root> root_ptr;
+pmem::obj::persistent_ptr <root> root_ptr;
 
- void insertFromThread(int tid)
- {
- 	std::cout << "Log iFT, tid=" << tid << std::endl;
+void insertFromThread(int tid) {
+    std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 100; i >= 0; i--) {
+    for (int i = 100; i >= 0; i--) {
 
- 		root_ptr->pmap->insertNew(i+64*tid, i+64*tid);
- 	}
- }
+        root_ptr->pmap->insertNew(i + 64 * tid, i + 64 * tid);
+    }
+}
 
-void getFromThread(int tid)
-{
+void getFromThread(int tid) {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 100; i >= 0; i--) {
-        root_ptr->pmap->get(i+64*tid);
+    for (int i = 100; i >= 0; i--) {
+        root_ptr->pmap->get(i + 64 * tid);
     }
 }
 
 int main(int argc, char *argv[]) {
 
     pmem::obj::pool <root> pop;
-    std::string path = argv[1];
+    std::string path =
+            argv[1];
     std::string mode = argv[2];
     bool insertMode = false;
 
     std::cout << "path: " << path.c_str() << std::endl;
     try {
         if (!file_exists(path.c_str())) {
-            std::cout << "File doesn't exists, creating pool"<<std::endl;
+            std::cout << "File doesn't exists, creating pool" << std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                    PMEMOBJ_MIN_POOL*16, (S_IWUSR|S_IRUSR));
+                                                PMEMOBJ_MIN_POOL * 16, (S_IWUSR | S_IRUSR));
             insertMode = true;
         } else {
-            std::cout << "File exists, opening pool"<<std::endl;
+            std::cout << "File exists, opening pool" << std::endl;
             pop = pmem::obj::pool<root>::open(path, "");
         }
     } catch (pmem::pool_error &e) {
@@ -65,15 +64,15 @@ int main(int argc, char *argv[]) {
 
     if (!root_ptr->pmap) {
         pmem::obj::transaction::run(pop, [&] {
-            std::cout << "Creating NvmHashMap"<<std::endl;
+            std::cout << "Creating NvmHashMap" << std::endl;
 //            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, std::string> >();
             root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >();
         });
     }
-     auto start = std::chrono::system_clock::now();
-     if (insertMode) {
-         if (mode == "multithread") {
-             std::thread t1(insertFromThread, 0);
+    auto start = std::chrono::system_clock::now();
+    if (insertMode) {
+        if (mode == "multithread") {
+            std::thread t1(insertFromThread, 0);
 //             std::thread t2(insertFromThread, 1);
 //             std::thread t3(insertFromThread, 2);
 //             std::thread t4(insertFromThread, 3);
@@ -82,9 +81,9 @@ int main(int argc, char *argv[]) {
 //             std::thread t7(insertFromThread, 6);
 //             std::thread t8(insertFromThread, 7);
 
-             std::cout << "Inserting values to array" << std::endl;
+            std::cout << "Inserting values to array" << std::endl;
 
-             t1.join();
+            t1.join();
 //             t2.join();
 //             t3.join();
 //             t4.join();
@@ -92,13 +91,13 @@ int main(int argc, char *argv[]) {
 //             t6.join();
 //             t7.join();
 //             t8.join();
-         }
-         auto end = std::chrono::system_clock::now();
-         std::chrono::duration<double> elapsed_time = end-start;
-         std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
-     } else {
-         std::cout << "Getting values from array" << std::endl;
-         std::thread t1(getFromThread, 0);
+        }
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end - start;
+        std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
+    } else {
+        std::cout << "Getting values from array" << std::endl;
+        std::thread t1(getFromThread, 0);
 //         std::thread t2(getFromThread, 1);
 //         std::thread t3(getFromThread, 2);
 //         std::thread t4(getFromThread, 3);
@@ -106,7 +105,7 @@ int main(int argc, char *argv[]) {
 //         std::thread t6(getFromThread, 5);
 //         std::thread t7(getFromThread, 6);
 //         std::thread t8(getFromThread, 7);
-         t1.join();
+        t1.join();
 //         t2.join();
 //         t3.join();
 //         t4.join();
@@ -114,9 +113,9 @@ int main(int argc, char *argv[]) {
 //         t6.join();
 //         t7.join();
 //         t8.join();
-         auto end = std::chrono::system_clock::now();
-         std::chrono::duration<double> elapsed_time = end-start;
-         std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end - start;
+        std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
 
-     }
+    }
 }
