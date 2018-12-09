@@ -8,13 +8,16 @@
 #include <libpmemobj++/make_persistent.hpp>
 #include <libpmemobj++/make_persistent_atomic.hpp>
 #include <libpmemobj++/mutex.hpp>
+#include <libpmemobj++/shared_mutex.hpp>
 #include <libpmemobj++/make_persistent_array.hpp>
 #include <unistd.h>
 #include <memory>
 #include <string.h>
 #include <mutex>
+#include <shared_mutex>
 
-#define INTERNAL_MAPS_COUNT 8
+#define INTERNAL_MAPS_COUNT 16
+template<class, class> class Iterator;
 
 template<class V>
         class Value {
@@ -61,20 +64,32 @@ public:
     }
 };
 
-template<typename V, typename K>
+template<class K, class V>
 class NvmHashMap {
 private:
     pmem::obj::persistent_ptr<ArrayOfSegments<K, V> > arrayOfSegments[INTERNAL_MAPS_COUNT];
-    pmem::obj::mutex arrayOfSegmentsMutex[INTERNAL_MAPS_COUNT];
+    pmem::obj::shared_mutex arrayOfSegmentsMutex[INTERNAL_MAPS_COUNT];
 
     unsigned long long int hash(K key) {
         unsigned long long int keyPositive = (unsigned long long int) std::hash<K>()(key);
         return abs(keyPositive);
     }
 
+    pmem::obj::persistent_ptr<ArrayOfSegments<K, V> > getArrayOfSegmentsWithId(int id)
+    {
+        if(id < INTERNAL_MAPS_COUNT)
+            return arrayOfSegmentsMutex[id];
+        else return nullptr;
+    }
 
+    NvmHashMap<K,V>* getPtr()
+    {
+        return this;
+    }
 
 public:
+
+    friend class Iterator<K,V>;
 
     NvmHashMap() {
         std::cout << "NvmHashMap() start" << std::endl;
@@ -89,7 +104,8 @@ public:
         int hash = this->hash(key);
         int index = hash & (INTERNAL_MAPS_COUNT - 1);
 
-        std::unique_lock <pmem::obj::mutex> lock(arrayOfSegmentsMutex[index]);
+
+        std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfSegmentsMutex[index]);
 //        std::cout << "Locked. Key = " << key << ". Hash = " << hash << ". Value = " << value << std::endl;
 
         if(this->needResize(index)) {
@@ -316,6 +332,84 @@ public:
         }
         return (V) 0;
     }
+
+template<class K, class V> class Iterator
+{
+private:
+    NvmHashMap<K,V>* mapPointer;
+    pmem::obj::persistent_ptr<SegmentObject<K,V> > currentSegmentObject;
+    Segment<K,V> currentSegment;
+    pmem::obj::persistent_ptr<ArrayOfSegments<K, V> > currentArray;
+    int currentSegmentIndex;
+    int currentArrayIndex;
+
+public:
+    Iterator() = delete;
+
+    Iterator(pmem::obj::persistent_ptr<NvmHashMap<K, V> > map)
+    {
+        mapPointer = map->getPtr();
+        currentArrayIndex = 0;
+        currentSegmentIndex = 0;
+        std::shared_lock<pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
+        currentArray = mapPointer->arrayOfSegments[currentArrayIndex];
+        currentSegment = currentArray->segments[currentArrayIndex];
+        currentSegmentObject = currentSegment.head;
+    }
+
+    V get()
+    {
+        return currentSegmentObject->value.get_ro();
+    }   
+
+    bool next()
+    {
+        while(true)
+        {
+            if(currentSegmentObject->next != nullptr)
+            {
+                std::shared_lock<pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
+                currentSegmentObject = currentSegmentObject->next;
+                return true;
+            }
+            else if(currentSegmentIndex - 1 < currentArray->arraySize)
+            {
+                std::shared_lock<pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
+                do
+                {
+                    currentSegment = currentArray->segments[++currentSegmentIndex];
+                } while (currentSegment.head == nullptr && currentSegmentIndex - 1 < currentArray->arraySize);
+                if(currentSegment.head != nullptr)
+                {
+                    currentSegmentObject = currentSegment.head;
+                    return true;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else if(currentArrayIndex < INTERNAL_MAPS_COUNT - 1)
+            {
+                //std::cout << "L5" << std::endl;
+                std::shared_lock<pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[++currentArrayIndex]);
+                currentArray = mapPointer->arrayOfSegments[currentArrayIndex];
+                currentSegmentIndex = 0;
+                currentSegment = currentArray->segments[0];
+                if(currentSegment.head != nullptr)
+                {
+                    currentSegmentObject = currentSegment.head;
+                    return true;
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else return false;
+        }
+    }     
+
 };
 
 
