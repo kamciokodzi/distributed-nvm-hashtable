@@ -23,24 +23,22 @@ void insertFromThread(int tid) {
     std::cout << "Log iFT, tid=" << tid << std::endl;
 
  	for(int i = 19; i >= 0; i--) {
-
-        root_ptr->pmap->insertNew(i + 64 * tid, i + 64 * tid);
+        root_ptr->pmap->insertNew(i * 64 + tid, i * 64 + tid);
     }
 }
 
 void getFromThread(int tid) {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 9; i >= 0; i--) {
-        root_ptr->pmap->get(i+64*tid);
+    for(int i = 19; i >= 0; i--) {
+        root_ptr->pmap->get(i * 64 + tid);
     }
 }
 
 int main(int argc, char *argv[]) {
 
     pmem::obj::pool <root> pop;
-    std::string path =
-            argv[1];
+    std::string path = argv[1];
     std::string mode = argv[2];
     bool insertMode = false;
 
@@ -73,6 +71,7 @@ int main(int argc, char *argv[]) {
      if (insertMode) {
          if (mode == "multithread") {
              std::thread t1(insertFromThread, 0);
+             std::thread t1(getFromThread, 0);
              std::cout << "Inserting values to array" << std::endl;
 
              t1.join();
@@ -87,8 +86,6 @@ int main(int argc, char *argv[]) {
          {
             std::cout << it.get() << std::endl;
          }
-
-
      } else {
          std::cout << "Getting values from array" << std::endl;
          std::thread t1(getFromThread, 0);
@@ -96,8 +93,5 @@ int main(int argc, char *argv[]) {
          auto end = std::chrono::system_clock::now();
          std::chrono::duration<double> elapsed_time = end-start;
          std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
-
      }
-
-    }
 }
