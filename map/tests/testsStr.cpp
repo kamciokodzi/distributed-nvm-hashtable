@@ -115,6 +115,7 @@ int main(int argc, char *argv[]) {
 
     pmem::obj::pool <root> pop;
     std::string path = argv[1];
+    std::cout << path << std::endl;
 
     try {
         if (!file_exists(path.c_str())) {

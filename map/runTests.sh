@@ -1,8 +1,11 @@
+rm performance.txt
 cd tests
 make
-cd .. 
+cd /mnt/mem 
 sudo rm -rf file*
+cd -
 make
-./tests/runTestsStr fileStr
-./tests/runTestsInt fileInt
+sudo ./runTestsPerformance /mnt/mem/filePerformance
+sudo ./runTestsStr /mnt/mem/fileStr
+sudo ./runTestsInt /mnt/mem/fileInt
 
