@@ -22,7 +22,7 @@ pmem::obj::persistent_ptr <root> root_ptr;
 void insertFromThread(int tid) {
     std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 1000; i >= 0; i--) {
+ 	for(int i = 12500; i >= 0; i--) {
         root_ptr->pmap->insertNew(i * 64 + tid, i * 64 + tid);
     }
 }
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
         pmem::obj::transaction::run(pop, [&] {
             std::cout << "Creating NvmHashMap" << std::endl;
 //            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, std::string> >();
-            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >();
+            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(4);
         });
     }
      auto start = std::chrono::system_clock::now();

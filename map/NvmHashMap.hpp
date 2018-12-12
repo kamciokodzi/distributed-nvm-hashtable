@@ -53,15 +53,18 @@ class ArrayOfSegments {
 public:
     pmem::obj::persistent_ptr<Segment<K, V>[]> segments;
     pmem::obj::p<int> arraySize;
+    pmem::obj::p<int> elementsCount;
 
     ArrayOfSegments() {
-        this->segments = pmem::obj::make_persistent<Segment<K, V>[]>(10);
-        this->arraySize = 10;
+        this->segments = pmem::obj::make_persistent<Segment<K, V>[]>(128);
+        this->arraySize = 128;
+        elementsCount = 0;
     }
 
     ArrayOfSegments(int arraySize) {
         this->segments = pmem::obj::make_persistent<Segment<K, V>[]>(arraySize);
         this->arraySize = arraySize;
+        elementsCount = 0;
     }
 };
 
@@ -108,12 +111,12 @@ public:
         int hash = this->hash(key);
         int index = hash & (this->internalMapsCount - 1);
 
-
         std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
 
-        if (this->needResize(index)) {
+        if (arrayOfSegments[index].elementsCount > 0.7*arrayOfSegments[index].arraySize) {
             expand(index);
         }
+        arrayOfSegments[index].elementsCount = arrayOfSegments[index].elementsCount + 1;
 
         int index2 = hash % this->arrayOfSegments[index].arraySize; //Important AFTER expand
 
@@ -183,8 +186,9 @@ public:
         int hash = this->hash(key);
         int index = hash & (this->internalMapsCount - 1);
         int index2 = hash % arrayOfSegments[index].arraySize;
-        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
+        std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
 
+        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
         while (true) {
             if (ptr == nullptr) {
                 break;
@@ -198,6 +202,7 @@ public:
                         arrayOfSegments[index].segments[index2].size =
                                 arrayOfSegments[index].segments[index2].size - 1;
                     });
+                    arrayOfSegments[index].elementsCount = arrayOfSegments[index].elementsCount - 1;
                     return value;
                 }
             }
@@ -212,6 +217,7 @@ public:
                         arrayOfSegments[index].segments[index2].size =
                                 arrayOfSegments[index].segments[index2].size - 1;
                     });
+                    arrayOfSegments[index].elementsCount = arrayOfSegments[index].elementsCount - 1;
                     return value;
                 }
                 ptr = ptr->next;
@@ -289,33 +295,6 @@ public:
         }
 
         return size;
-    }
-
-    bool needResize(int arrayIndex) {
-        int numberOfElements = 0;
-        int numberOfCollidedElements = 0;
-
-        for (int i = 0; i < this->arrayOfSegments[arrayIndex].arraySize; i++) {
-
-            if (this->arrayOfSegments[arrayIndex].segments[i].size > 1) {
-                numberOfCollidedElements += this->arrayOfSegments[arrayIndex].segments[i].size - 1;
-            }
-            numberOfElements += this->arrayOfSegments[arrayIndex].segments[i].size;
-        }
-
-        if (numberOfElements == 0) {
-            return false;
-        }
-
-//        std::cout<< "No of collided el. " << numberOfCollidedElements << std::endl;
-//        std::cout<< "No of el. " << numberOfElements << std::endl;
-//        std::cout<<"Ratio " << (float)numberOfCollidedElements/(float)numberOfElements << std::endl;
-
-        if ((float) numberOfCollidedElements / (float) numberOfElements >= 0.75) {
-            return true;
-        }
-
-        return false;
     }
 };
 
