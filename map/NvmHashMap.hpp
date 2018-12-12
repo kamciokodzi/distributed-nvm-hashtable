@@ -13,9 +13,8 @@
 #include <unistd.h>
 #include <memory>
 #include <string.h>
+#include <cmath>
 #include <shared_mutex>
-
-#define INTERNAL_MAPS_COUNT 16
 
 template<class, class>
 class Iterator;
@@ -69,18 +68,13 @@ public:
 template<class K, class V>
 class NvmHashMap {
 private:
-    pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> arrayOfSegments[INTERNAL_MAPS_COUNT];
-    pmem::obj::shared_mutex arrayOfSegmentsMutex[INTERNAL_MAPS_COUNT];
+    int internalMapsCount;
+    pmem::obj::persistent_ptr <ArrayOfSegments<K, V>[] > arrayOfSegments;
+    pmem::obj::persistent_ptr <pmem::obj::shared_mutex[]> arrayOfMutex;
 
     unsigned long long int hash(K key) {
         unsigned long long int keyPositive = (unsigned long long int) std::hash<K>()(key);
         return abs(keyPositive);
-    }
-
-    pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> getArrayOfSegmentsWithId(int id) {
-        if (id < INTERNAL_MAPS_COUNT)
-            return arrayOfSegmentsMutex[id];
-        else return nullptr;
     }
 
     NvmHashMap<K, V> *getPtr() {
@@ -92,29 +86,39 @@ public:
     friend class Iterator<K, V>;
 
     NvmHashMap() {
-        std::cout << "NvmHashMap() start" << std::endl;
-        for (int i = 0; i < INTERNAL_MAPS_COUNT; i++) {
-            this->arrayOfSegments[i] = pmem::obj::make_persistent<ArrayOfSegments<K, V> >();
+        this->internalMapsCount = 8;
+        arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V>[] >(this->internalMapsCount);
+        arrayOfMutex = pmem::obj::make_persistent<pmem::obj::shared_mutex[] >(this->internalMapsCount);
+        std::cout << "NvmHashMap() initialized" << std::endl;
+    }
+
+    NvmHashMap(int internalMapsCount) {
+        if (internalMapsCount <= 0 || (internalMapsCount & (internalMapsCount -1)) != 0) {
+            internalMapsCount = pow(2, std::floor(std::log2(internalMapsCount)));
         }
-        std::cout << "NvmHashMap() stop" << std::endl;
+        this->internalMapsCount = internalMapsCount;
+        arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V>[] >(this->internalMapsCount);
+        arrayOfMutex = pmem::obj::make_persistent<pmem::obj::shared_mutex[] >(this->internalMapsCount);
+        std::cout << "internalMC:" << this->internalMapsCount << std::endl;
+        std::cout << "NvmHashMap() initialized" << std::endl;
     }
 
 
     V insertNew(K key, V value) {
         int hash = this->hash(key);
-        int index = hash & (INTERNAL_MAPS_COUNT - 1);
+        int index = hash & (this->internalMapsCount - 1);
 
 
-        std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfSegmentsMutex[index]);
+        std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
 
         if (this->needResize(index)) {
             expand(index);
         }
 
-        int index2 = hash % this->arrayOfSegments[index]->arraySize; //Important AFTER expand
+        int index2 = hash % this->arrayOfSegments[index].arraySize; //Important AFTER expand
 
-        arrayOfSegments[index]->segments[index2].hash = hash;
-        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index]->segments[index2].head;
+        arrayOfSegments[index].segments[index2].hash = hash;
+        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
         while (true) {
             if (ptr == nullptr) { // empty list
@@ -123,8 +127,8 @@ public:
                     ptr = pmem::obj::make_persistent<SegmentObject<K, V> >();
                     ptr->key = key;
                     ptr->value = value;
-                    arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size + 1;
-                    arrayOfSegments[index]->segments[index2].head = ptr;
+                    arrayOfSegments[index].segments[index2].size = arrayOfSegments[index].segments[index2].size + 1;
+                    arrayOfSegments[index].segments[index2].head = ptr;
                 });
                 break;
             }
@@ -134,7 +138,7 @@ public:
                     ptr->next = pmem::obj::make_persistent<SegmentObject<K, V> >();
                     ptr->next->key = key;
                     ptr->next->value = value;
-                    arrayOfSegments[index]->segments[index2].size = arrayOfSegments[index]->segments[index2].size + 1;
+                    arrayOfSegments[index].segments[index2].size = arrayOfSegments[index].segments[index2].size + 1;
                 });
                 break;
             }
@@ -154,9 +158,9 @@ public:
 
     V get(K key) {
         int hash = this->hash(key);
-        int index = hash & (INTERNAL_MAPS_COUNT - 1);
-        int index2 = hash % arrayOfSegments[index]->arraySize;
-        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index]->segments[index2].head;
+        int index = hash & (this->internalMapsCount - 1);
+        int index2 = hash % arrayOfSegments[index].arraySize;
+        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
         while (true) {
             if (ptr == nullptr) {
@@ -177,9 +181,9 @@ public:
 
     V remove(K key) {
         int hash = this->hash(key);
-        int index = hash & (INTERNAL_MAPS_COUNT - 1);
-        int index2 = hash % arrayOfSegments[index]->arraySize;
-        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index]->segments[index2].head;
+        int index = hash & (this->internalMapsCount - 1);
+        int index2 = hash % arrayOfSegments[index].arraySize;
+        pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
         while (true) {
             if (ptr == nullptr) {
@@ -189,10 +193,10 @@ public:
                     V value = ptr->value;
                     auto pop = pmem::obj::pool_by_vptr(this);
                     pmem::obj::transaction::run(pop, [&] {
-                        arrayOfSegments[index]->segments[index2].head = ptr->next;
+                        arrayOfSegments[index].segments[index2].head = ptr->next;
                         pmem::obj::delete_persistent<SegmentObject<K, V> >(ptr);
-                        arrayOfSegments[index]->segments[index2].size =
-                                arrayOfSegments[index]->segments[index2].size - 1;
+                        arrayOfSegments[index].segments[index2].size =
+                                arrayOfSegments[index].segments[index2].size - 1;
                     });
                     return value;
                 }
@@ -205,8 +209,8 @@ public:
                     pmem::obj::transaction::run(pop, [&] {
                         pmem::obj::delete_persistent<SegmentObject<K, V> >(ptr->next);
                         ptr->next = temp;
-                        arrayOfSegments[index]->segments[index2].size =
-                                arrayOfSegments[index]->segments[index2].size - 1;
+                        arrayOfSegments[index].segments[index2].size =
+                                arrayOfSegments[index].segments[index2].size - 1;
                     });
                     return value;
                 }
@@ -219,14 +223,14 @@ public:
     }
 
     void expand(int arrayIndex) {
-        int arraySize = this->arrayOfSegments[arrayIndex]->arraySize;
+        int arraySize = this->arrayOfSegments[arrayIndex].arraySize;
 
-        pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> arrayOfSegments;
+        pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> newArrayOfSegments;
         auto pop = pmem::obj::pool_by_vptr(this);
         pmem::obj::transaction::run(pop, [&] {
-            arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V> >(2 * arraySize);
+            newArrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V> >(2 * arraySize);
 
-//            std::cout<< "NEW SIZE " << arrayOfSegments->arraySize << std::endl;
+//            std::cout<< "NEW SIZE " << arrayOfSegments.arraySize << std::endl;
 
             int hash;
             int index2;
@@ -235,19 +239,19 @@ public:
 
             for (int i = 0; i < arraySize; i++) {
                 while (true) {
-                    ptr = this->arrayOfSegments[arrayIndex]->segments[i].head;
+                    ptr = this->arrayOfSegments[arrayIndex].segments[i].head;
                     if (ptr == nullptr) {
                         break;
                     }
-                    this->arrayOfSegments[arrayIndex]->segments[i].head = ptr->next;
+                    this->arrayOfSegments[arrayIndex].segments[i].head = ptr->next;
                     ptr->next = nullptr;
 
                     hash = this->hash(ptr->key);
-                    index2 = hash % arrayOfSegments->arraySize;
+                    index2 = hash % newArrayOfSegments->arraySize;
 //                    std::cout<<"Old index: "<<hash % arraySize<<" New index: "<<index2<<std::endl;
-                    tmp = arrayOfSegments->segments[index2].head;
+                    tmp = newArrayOfSegments->segments[index2].head;
                     if (tmp == nullptr) {
-                        arrayOfSegments->segments[index2].head = ptr;
+                        newArrayOfSegments->segments[index2].head = ptr;
                     } else {
                         while (true) {
                             if (tmp->next == nullptr) {
@@ -260,15 +264,15 @@ public:
                     }
                 }
             }
-            pmem::obj::delete_persistent<ArrayOfSegments<K, V> >(this->arrayOfSegments[arrayIndex]);
-            this->arrayOfSegments[arrayIndex] = arrayOfSegments;
+//            pmem::obj::delete_persistent<ArrayOfSegments<K, V> >(this->arrayOfSegments[arrayIndex]);
+            this->arrayOfSegments[arrayIndex] = *newArrayOfSegments;
         });
     }
 
     int getMapSize() {
         int size = 0;
 
-        for (int i = 0; i < INTERNAL_MAPS_COUNT; i++) {
+        for (int i = 0; i < this->internalMapsCount; i++) {
             for (int j = 0; j < this->arrayOfSegments[i]->arraySize; j++) {
                 size += this->arrayOfSegments[i]->segments[j].size;
             }
@@ -280,8 +284,8 @@ public:
     int getNumberOfInsertedElements(int arrayIndex) {
         int size = 0;
 
-        for (int i = 0; i < this->arrayOfSegments[arrayIndex]->arraySize; i++) {
-            size += this->arrayOfSegments[arrayIndex]->segments[i].size;
+        for (int i = 0; i < this->arrayOfSegments[arrayIndex].arraySize; i++) {
+            size += this->arrayOfSegments[arrayIndex].segments[i].size;
         }
 
         return size;
@@ -291,12 +295,12 @@ public:
         int numberOfElements = 0;
         int numberOfCollidedElements = 0;
 
-        for (int i = 0; i < this->arrayOfSegments[arrayIndex]->arraySize; i++) {
+        for (int i = 0; i < this->arrayOfSegments[arrayIndex].arraySize; i++) {
 
-            if (this->arrayOfSegments[arrayIndex]->segments[i].size > 1) {
-                numberOfCollidedElements += this->arrayOfSegments[arrayIndex]->segments[i].size - 1;
+            if (this->arrayOfSegments[arrayIndex].segments[i].size > 1) {
+                numberOfCollidedElements += this->arrayOfSegments[arrayIndex].segments[i].size - 1;
             }
-            numberOfElements += this->arrayOfSegments[arrayIndex]->segments[i].size;
+            numberOfElements += this->arrayOfSegments[arrayIndex].segments[i].size;
         }
 
         if (numberOfElements == 0) {
@@ -321,7 +325,7 @@ private:
     NvmHashMap<K, V> *mapPointer;
     pmem::obj::persistent_ptr <SegmentObject<K, V>> currentSegmentObject;
     Segment<K, V> currentSegment;
-    pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> currentArray;
+    pmem::obj::persistent_ptr<ArrayOfSegments<K, V> > currentArray;
     int currentSegmentIndex;
     int currentArrayIndex;
 
@@ -329,12 +333,15 @@ public:
     Iterator() = delete;
 
     Iterator(pmem::obj::persistent_ptr <NvmHashMap<K, V>> map) {
+        std::cout << "Log0" << std::endl;
         mapPointer = map->getPtr();
         currentArrayIndex = 0;
         currentSegmentIndex = 0;
-        std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
-        currentArray = mapPointer->arrayOfSegments[currentArrayIndex];
-        currentSegment = currentArray->segments[currentArrayIndex];
+        std::cout << "Log2" << std::endl;
+        std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
+        std::cout << "Log1" << std::endl;
+        currentArray = mapPointer->arrayOfSegments+currentArrayIndex;
+        currentSegment = currentArray.segments[currentArrayIndex];
         currentSegmentObject = currentSegment.head;
     }
 
@@ -345,25 +352,25 @@ public:
     bool next() {
         while (true) {
             if (currentSegmentObject->next != nullptr) {
-                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
+                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
                 currentSegmentObject = currentSegmentObject->next;
                 return true;
-            } else if (currentSegmentIndex - 1 < currentArray->arraySize) {
-                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[currentArrayIndex]);
+            } else if (currentSegmentIndex - 1 < currentArray.arraySize) {
+                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
                 do {
-                    currentSegment = currentArray->segments[++currentSegmentIndex];
-                } while (currentSegment.head == nullptr && currentSegmentIndex - 1 < currentArray->arraySize);
+                    currentSegment = currentArray.segments[++currentSegmentIndex];
+                } while (currentSegment.head == nullptr && currentSegmentIndex - 1 < currentArray.arraySize);
                 if (currentSegment.head != nullptr) {
                     currentSegmentObject = currentSegment.head;
                     return true;
                 } else {
                     continue;
                 }
-            } else if (currentArrayIndex < INTERNAL_MAPS_COUNT - 1) {
-                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfSegmentsMutex[++currentArrayIndex]);
+            } else if (currentArrayIndex < mapPointer->internalMapsCount - 1) {
+                std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[++currentArrayIndex]);
                 currentArray = mapPointer->arrayOfSegments[currentArrayIndex];
                 currentSegmentIndex = 0;
-                currentSegment = currentArray->segments[0];
+                currentSegment = currentArray.segments[0];
                 if (currentSegment.head != nullptr) {
                     currentSegmentObject = currentSegment.head;
                     return true;

@@ -1,4 +1,4 @@
-rm performance.txt
+sudo rm performance.txt
 cd tests
 make
 cd /mnt/mem 

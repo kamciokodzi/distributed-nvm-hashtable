@@ -41,6 +41,7 @@ TEST(NvmHashMapStr, Insert100Get100StrTest) {
     for (int i = 100; i >= 0; i--) {
         std::string returnValue = root_ptr->pmapString->get(std::to_string(i));
         ASSERT_EQ(std::to_string(i+2), returnValue);
+
     }
 }
 
