@@ -108,7 +108,6 @@ public:
         int hash = this->hash(key);
         int index = hash & (this->internalMapsCount - 1);
 
-
         std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
 
         if (this->needResize(index)) {
@@ -225,8 +224,11 @@ public:
     void expand(int arrayIndex) {
         int arraySize = this->arrayOfSegments[arrayIndex].arraySize;
 
+//        std::unique_lock <pmem::obj::shared_mutex> lock(this->arrayOfMutex[arrayIndex]);
+
         pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> newArrayOfSegments;
         auto pop = pmem::obj::pool_by_vptr(this);
+
         pmem::obj::transaction::run(pop, [&] {
             newArrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V> >(2 * arraySize);
 
