@@ -6,7 +6,8 @@
 #include <string.h>
 #include <future>
 
-#define AMOUNT 1000
+#define ELEMENTS_COUNT 10000
+#define THREADS_COUNT 8
 
 void func(std::promise<int> && p) {
     p.set_value(1);
@@ -29,38 +30,36 @@ pmem::obj::persistent_ptr<root> root_ptr;
 
 void insertFromThread(int tid)
 {
-    for(int i = AMOUNT; i >= 0; i--) {
-        root_ptr->pmapInt->insertNew(i*64+tid, i*64+tid);
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapInt->insertNew(i*THREADS_COUNT+tid, i*THREADS_COUNT+tid);
     }
 }
 
 void removeFromThread(int tid)
 {
-    for(int i = AMOUNT; i >= 0; i--) {
-        root_ptr->pmapInt->remove(i*64+tid);
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapInt->remove(i*THREADS_COUNT+tid);
     }
 }
 
 TEST(NvmHashMapInt, InsertGetTest) {
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapInt->insertNew(i, i+2);
     }
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         int returnValue = root_ptr->pmapInt->get(i);
         ASSERT_EQ(i+2, returnValue);
     }
-    std::remove("/mnt/mem/fileInt");
 }
 
 TEST(NvmHashMapInt, InsertRemoveTest) {
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapInt->insertNew(i, i+2);
     }
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         int returnValue = root_ptr->pmapInt->remove(i);
         ASSERT_EQ(i+2, returnValue);
     }
-    std::remove("/mnt/mem/fileInt");
 }
 
 TEST(NvmHashMapIntParallel, InsertGetTest) {
@@ -82,13 +81,12 @@ TEST(NvmHashMapIntParallel, InsertGetTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = AMOUNT; i >= 0; i--) {
-            int returnValue = root_ptr->pmapInt->get(i*64+tid);
-            ASSERT_EQ(i*64+tid, returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            int returnValue = root_ptr->pmapInt->get(i*THREADS_COUNT+tid);
+            ASSERT_EQ(i*THREADS_COUNT+tid, returnValue);
         }
     }
-    std::remove("/mnt/mem/fileInt");
 }
 
 
@@ -111,13 +109,12 @@ TEST(NvmHashMapIntParallel, InsertRemoveTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = AMOUNT; i >= 0; i--) {
-            int returnValue = root_ptr->pmapInt->remove(i*64+tid);
-            ASSERT_EQ(i*64+tid, returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            int returnValue = root_ptr->pmapInt->remove(i*THREADS_COUNT+tid);
+            ASSERT_EQ(i*THREADS_COUNT+tid, returnValue);
         }
     }
-    std::remove("/mnt/mem/fileInt");
 }
 
 //TEST(NvmHashMapIntParallel, Insert100IterateCheckSumTest) {

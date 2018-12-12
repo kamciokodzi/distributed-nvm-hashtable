@@ -3,6 +3,8 @@
 #include <chrono>
 #include <ctime>
 
+#define THREADS_COUNT 8
+
 struct root {
 //    pmem::obj::persistent_ptr<NvmHashMap<int, std::string> > pmap;
     pmem::obj::persistent_ptr <NvmHashMap<int, int>> pmap;
@@ -22,16 +24,16 @@ pmem::obj::persistent_ptr <root> root_ptr;
 void insertFromThread(int tid) {
     std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 12500; i >= 0; i--) {
-        root_ptr->pmap->insertNew(i * 64 + tid, i * 64 + tid);
+ 	for(int i = 100; i >= 0; i--) {
+        root_ptr->pmap->insertNew(i * THREADS_COUNT + tid, i * THREADS_COUNT + tid);
     }
 }
 
 void getFromThread(int tid) {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 19; i >= 0; i--) {
-        root_ptr->pmap->get(i * 64 + tid);
+    for(int i = 100; i >= 0; i--) {
+        root_ptr->pmap->get(i * THREADS_COUNT + tid);
     }
 }
 
@@ -42,12 +44,11 @@ int main(int argc, char *argv[]) {
     std::string mode = argv[2];
     bool insertMode = false;
 
-    std::cout << "path: " << path.c_str() << std::endl;
     try {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool" << std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                                                PMEMOBJ_MIN_POOL * 16, (S_IWUSR | S_IRUSR));
+                                                PMEMOBJ_MIN_POOL * 32, (S_IWUSR | S_IRUSR));
             insertMode = true;
         } else {
             std::cout << "File exists, opening pool" << std::endl;
@@ -64,7 +65,7 @@ int main(int argc, char *argv[]) {
         pmem::obj::transaction::run(pop, [&] {
             std::cout << "Creating NvmHashMap" << std::endl;
 //            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, std::string> >();
-            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(4);
+            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(THREADS_COUNT);
         });
     }
      auto start = std::chrono::system_clock::now();
@@ -90,15 +91,15 @@ int main(int argc, char *argv[]) {
              auto end = std::chrono::system_clock::now();
              std::chrono::duration<double> elapsed_time = end-start;
              std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
-             for (int tid = 0; tid < 8; tid++) {
-                 for (int i = 10000; i >= 0; i--) {
-                     int returnValue = root_ptr->pmap->get(i*64+tid);
-                 }
-             }
+             std::thread t9(getFromThread, 0);
+             std::thread t20(getFromThread, 1);
+             std::thread t30(getFromThread, 2);
+
+             t9.join();
+             t20.join();
+             t30.join();
+
          }
-         auto end = std::chrono::system_clock::now();
-         std::chrono::duration<double> elapsed_time = end-start;
-         std::cout << "Getting took " << elapsed_time.count() << " seconds." << std::endl;
 //         Iterator<int,int> it(root_ptr->pmap);
 //         std::cout << it.get() << std::endl;
 //         while (it.next()) {

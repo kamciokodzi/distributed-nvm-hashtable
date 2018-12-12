@@ -5,7 +5,8 @@
 #include <ctime>
 #include <string.h>
 
-#define AMOUNT 10000
+#define ELEMENTS_COUNT 10000
+#define THREADS_COUNT 8
 
 struct root {
     pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmapString;
@@ -24,8 +25,8 @@ bool file_exists(const char *fname) {
 pmem::obj::persistent_ptr<root> root_ptr;
 
 void insertFromThread(int tid) {
-    for(int i = AMOUNT; i >= 0; i--) {
-        root_ptr->pmapString->insertNew(std::to_string(i*64+tid), std::to_string(i*64+tid));
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapString->insertNew(std::to_string(i*THREADS_COUNT+tid), std::to_string(i*THREADS_COUNT+tid));
     }
 }
 
@@ -36,25 +37,23 @@ void removeFromThread(int tid) {
 }
 
 TEST(NvmHashMapStr, InsertGetTest) {
-    for (int i = AMOUNT; i >= 0; i--) {
-        root_ptr->pmapString->insertNew(std::to_string(i), std::to_string(i+AMOUNT));
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapString->insertNew(std::to_string(i), std::to_string(i+2));
     }
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         std::string returnValue = root_ptr->pmapString->get(std::to_string(i));
-        ASSERT_EQ(std::to_string(i+AMOUNT), returnValue);
+        ASSERT_EQ(std::to_string(i+2), returnValue);
     }
-    std::remove("/mnt/mem/fileStr");
 }
 
 TEST(NvmHashMapStr, InsertRemoveTest) {
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapString->insertNew(std::to_string(i), std::to_string(i+2));
     }
-    for (int i = AMOUNT; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         std::string returnValue = root_ptr->pmapString->remove(std::to_string(i));
         ASSERT_EQ(std::to_string(i+2), returnValue);
     }
-    std::remove("/mnt/mem/fileStr");
 }
 
 TEST(NvmHashMapStrParallel, InsertGetTest) {
@@ -76,13 +75,12 @@ TEST(NvmHashMapStrParallel, InsertGetTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = AMOUNT; i >= 0; i--) {
-            std::string returnValue = root_ptr->pmapString->get(std::to_string(i*64+tid));
-            ASSERT_EQ(std::to_string(i*64+tid), returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            std::string returnValue = root_ptr->pmapString->get(std::to_string(i*THREADS_COUNT+tid));
+            ASSERT_EQ(std::to_string(i*THREADS_COUNT+tid), returnValue);
         }
     }
-    std::remove("/mnt/mem/fileStr");
 }
 
 
@@ -105,13 +103,12 @@ TEST(NvmHashMapStrParallel, InsertRemoveTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = AMOUNT; i >= 0; i--) {
-            std::string returnValue = root_ptr->pmapString->remove(std::to_string(i*64+tid));
-            ASSERT_EQ(std::to_string(i*64+tid), returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            std::string returnValue = root_ptr->pmapString->remove(std::to_string(i*THREADS_COUNT+tid));
+            ASSERT_EQ(std::to_string(i*THREADS_COUNT+tid), returnValue);
         }
     }
-    std::remove("/mnt/mem/fileStr");
 }
 
 

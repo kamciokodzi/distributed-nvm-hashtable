@@ -8,4 +8,3 @@ make
 sudo ./runTestsPerformance /mnt/mem/filePerformance
 sudo ./runTestsStr /mnt/mem/fileStr
 sudo ./runTestsInt /mnt/mem/fileInt
-

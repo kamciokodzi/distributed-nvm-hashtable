@@ -56,8 +56,8 @@ public:
     pmem::obj::p<int> elementsCount;
 
     ArrayOfSegments() {
-        this->segments = pmem::obj::make_persistent<Segment<K, V>[]>(128);
-        this->arraySize = 128;
+        this->segments = pmem::obj::make_persistent<Segment<K, V>[]>(1024);
+        this->arraySize = 1024;
         elementsCount = 0;
     }
 
@@ -102,7 +102,6 @@ public:
         this->internalMapsCount = internalMapsCount;
         arrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V>[] >(this->internalMapsCount);
         arrayOfMutex = pmem::obj::make_persistent<pmem::obj::shared_mutex[] >(this->internalMapsCount);
-        std::cout << "internalMC:" << this->internalMapsCount << std::endl;
         std::cout << "NvmHashMap() initialized" << std::endl;
     }
 
@@ -110,6 +109,8 @@ public:
     V insertNew(K key, V value) {
         int hash = this->hash(key);
         int index = hash & (this->internalMapsCount - 1);
+
+        hash = hash >> int(std::log2(internalMapsCount));
 
         std::unique_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
 
@@ -124,8 +125,8 @@ public:
         pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
         while (true) {
+            auto pop = pmem::obj::pool_by_vptr(this);
             if (ptr == nullptr) { // empty list
-                auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
                     ptr = pmem::obj::make_persistent<SegmentObject<K, V> >();
                     ptr->key = key;
@@ -135,8 +136,13 @@ public:
                 });
                 break;
             }
+            if (ptr->key.get_rw() == key) {
+                pmem::obj::transaction::run(pop, [&] {
+                    ptr->value = value;
+                });
+                break;
+            }
             if (ptr->next == nullptr) { // it's the last item of the list
-                auto pop = pmem::obj::pool_by_vptr(this);
                 pmem::obj::transaction::run(pop, [&] {
                     ptr->next = pmem::obj::make_persistent<SegmentObject<K, V> >();
                     ptr->next->key = key;
@@ -145,11 +151,6 @@ public:
                 });
                 break;
             }
-            if (ptr->key.get_rw() == key) {
-                ptr->value = value;
-                break;
-            }
-
             if (ptr->next != nullptr) {
                 ptr = ptr->next;
             } else {
@@ -162,7 +163,9 @@ public:
     V get(K key) {
         int hash = this->hash(key);
         int index = hash & (this->internalMapsCount - 1);
+        hash = hash >> int(std::log2(internalMapsCount));
         int index2 = hash % arrayOfSegments[index].arraySize;
+        std::shared_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
         pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
         while (true) {
@@ -179,7 +182,7 @@ public:
                 break;
             }
         }
-        return (V) 0;
+        throw "Did not found element";
     }
 
     V remove(K key) {
@@ -225,19 +228,17 @@ public:
                 break;
             }
         }
-        return (V) 0;
+        throw "Did not found element";
     }
 
     void expand(int arrayIndex) {
         int arraySize = this->arrayOfSegments[arrayIndex].arraySize;
 
-//        std::unique_lock <pmem::obj::shared_mutex> lock(this->arrayOfMutex[arrayIndex]);
-
         pmem::obj::persistent_ptr <ArrayOfSegments<K, V>> newArrayOfSegments;
         auto pop = pmem::obj::pool_by_vptr(this);
 
         pmem::obj::transaction::run(pop, [&] {
-            newArrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V> >(2 * arraySize);
+            newArrayOfSegments = pmem::obj::make_persistent<ArrayOfSegments<K, V> >(4 * arraySize);
 
 //            std::cout<< "NEW SIZE " << arrayOfSegments.arraySize << std::endl;
 
@@ -307,7 +308,7 @@ private:
     NvmHashMap<K, V> *mapPointer;
     pmem::obj::persistent_ptr <SegmentObject<K, V>> currentSegmentObject;
     Segment<K, V> currentSegment;
-    pmem::obj::persistent_ptr<ArrayOfSegments<K, V> > currentArray;
+    ArrayOfSegments<K, V> *currentArray;
     int currentSegmentIndex;
     int currentArrayIndex;
 
@@ -315,15 +316,12 @@ public:
     Iterator() = delete;
 
     Iterator(pmem::obj::persistent_ptr <NvmHashMap<K, V>> map) {
-        std::cout << "Log0" << std::endl;
         mapPointer = map->getPtr();
         currentArrayIndex = 0;
         currentSegmentIndex = 0;
-        std::cout << "Log2" << std::endl;
         std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
-        std::cout << "Log1" << std::endl;
-        currentArray = mapPointer->arrayOfSegments+currentArrayIndex;
-        currentSegment = currentArray.segments[currentArrayIndex];
+        currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
+        currentSegment = currentArray->segments[currentArrayIndex];
         currentSegmentObject = currentSegment.head;
     }
 
@@ -337,11 +335,11 @@ public:
                 std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
                 currentSegmentObject = currentSegmentObject->next;
                 return true;
-            } else if (currentSegmentIndex - 1 < currentArray.arraySize) {
+            } else if (currentSegmentIndex - 1 < currentArray->arraySize) {
                 std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
                 do {
-                    currentSegment = currentArray.segments[++currentSegmentIndex];
-                } while (currentSegment.head == nullptr && currentSegmentIndex - 1 < currentArray.arraySize);
+                    currentSegment = currentArray->segments[++currentSegmentIndex];
+                } while (currentSegment.head == nullptr && currentSegmentIndex - 1 < currentArray->arraySize);
                 if (currentSegment.head != nullptr) {
                     currentSegmentObject = currentSegment.head;
                     return true;
@@ -350,9 +348,9 @@ public:
                 }
             } else if (currentArrayIndex < mapPointer->internalMapsCount - 1) {
                 std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[++currentArrayIndex]);
-                currentArray = mapPointer->arrayOfSegments[currentArrayIndex];
+                currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
                 currentSegmentIndex = 0;
-                currentSegment = currentArray.segments[0];
+                currentSegment = currentArray->segments[0];
                 if (currentSegment.head != nullptr) {
                     currentSegmentObject = currentSegment.head;
                     return true;

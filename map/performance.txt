@@ -1,2 +1,2 @@
-8 threads inserting 100 ints per each 0.0106918 seconds.
-8 threads getting 100 ints per each: 0.00119773 seconds.
+8 threads inserting 100 ints per each 0.00659636 seconds.
+8 threads getting 100 ints per each: 0.000716897 seconds.
