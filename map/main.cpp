@@ -6,8 +6,8 @@
 #define THREADS_COUNT 8
 
 struct root {
-//    pmem::obj::persistent_ptr<NvmHashMap<int, std::string> > pmap;
-    pmem::obj::persistent_ptr <NvmHashMap<int, int>> pmap;
+    pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmap;
+//    pmem::obj::persistent_ptr <NvmHashMap<int, int>> pmap;
 };
 
 bool file_exists(const char *fname) {
@@ -24,16 +24,17 @@ pmem::obj::persistent_ptr <root> root_ptr;
 void insertFromThread(int tid) {
     std::cout << "Log iFT, tid=" << tid << std::endl;
 
- 	for(int i = 100; i >= 0; i--) {
-        root_ptr->pmap->insertNew(i * THREADS_COUNT + tid, i * THREADS_COUNT + tid);
+ 	for(int i = 10000; i >= 0; i--) {
+//        root_ptr->pmap->insertNew(i * THREADS_COUNT + tid, i * THREADS_COUNT + tid);
+        root_ptr->pmap->insertNew(std::to_string(i * THREADS_COUNT + tid), std::to_string(i * THREADS_COUNT + tid));
     }
 }
 
 void getFromThread(int tid) {
     std::cout << "Log gFT, tid=" << tid << std::endl;
 
-    for(int i = 100; i >= 0; i--) {
-        root_ptr->pmap->get(i * THREADS_COUNT + tid);
+    for(int i = 10000; i >= 0; i--) {
+        root_ptr->pmap->get(std::to_string(i * THREADS_COUNT + tid));
     }
 }
 
@@ -48,7 +49,7 @@ int main(int argc, char *argv[]) {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool" << std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                                                PMEMOBJ_MIN_POOL * 32, (S_IWUSR | S_IRUSR));
+                                                PMEMOBJ_MIN_POOL * 16, (S_IWUSR | S_IRUSR));
             insertMode = true;
         } else {
             std::cout << "File exists, opening pool" << std::endl;
@@ -64,8 +65,8 @@ int main(int argc, char *argv[]) {
     if (!root_ptr->pmap) {
         pmem::obj::transaction::run(pop, [&] {
             std::cout << "Creating NvmHashMap" << std::endl;
-//            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, std::string> >();
-            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(THREADS_COUNT);
+            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<std::string, std::string> >();
+//            root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(THREADS_COUNT);
         });
     }
      auto start = std::chrono::system_clock::now();
@@ -91,13 +92,24 @@ int main(int argc, char *argv[]) {
              auto end = std::chrono::system_clock::now();
              std::chrono::duration<double> elapsed_time = end-start;
              std::cout << "Inserting took " << elapsed_time.count() << " seconds." << std::endl;
-             std::thread t9(getFromThread, 0);
+             std::thread t10(getFromThread, 0);
              std::thread t20(getFromThread, 1);
              std::thread t30(getFromThread, 2);
+             std::thread t40(getFromThread, 3);
+             std::thread t50(getFromThread, 4);
+             std::thread t60(getFromThread, 5);
+             std::thread t70(getFromThread, 6);
+             std::thread t80(getFromThread, 7);
 
-             t9.join();
+
+             t10.join();
              t20.join();
              t30.join();
+             t40.join();
+             t50.join();
+             t60.join();
+             t70.join();
+             t80.join();
 
          }
 //         Iterator<int,int> it(root_ptr->pmap);
