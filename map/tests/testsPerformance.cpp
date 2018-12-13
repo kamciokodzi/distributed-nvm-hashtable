@@ -6,6 +6,8 @@
 #include <string.h>
 #include <fstream>
 
+#define ELEMENTS_COUNT 10000
+#define MAX_THREADS_COUNT 64
 
 struct root {
     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmapInt;
@@ -26,20 +28,20 @@ std::ofstream outFile;
 
 void insertIntFromThread(int tid)
 {
-    for(int i = 100; i >= 0; i--) {
-        root_ptr->pmapInt->insertNew(i*64+tid, i*64+tid);
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapInt->insertNew(i*MAX_THREADS_COUNT+tid, i*MAX_THREADS_COUNT+tid);
     }
 }
 
 void removeIntFromThread(int tid)
 {
-    for(int i = 100; i >= 0; i--) {
-        root_ptr->pmapInt->remove(i*64+tid);
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapInt->remove(i*MAX_THREADS_COUNT+tid);
     }
 }
 
 
-TEST(NvmHashMapIntParallelPerformance, Insert100Get100IntTest) {
+TEST(NvmHashMapIntParallelPerformance, 8ThreadsInsertGetTest) {
     auto start = std::chrono::system_clock::now();
 
     std::thread t1(insertIntFromThread, 0);
@@ -62,19 +64,19 @@ TEST(NvmHashMapIntParallelPerformance, Insert100Get100IntTest) {
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "8 threads inserting 100 ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << "8 threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
 
     start = std::chrono::system_clock::now();
 
     for (int tid = 0; tid < 8; tid++) {
-        for (int i = 100; i >= 0; i--) {
-            int returnValue = root_ptr->pmapInt->get(i*64+tid);
-            ASSERT_EQ(i*64+tid, returnValue);
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            int returnValue = root_ptr->pmapInt->get(i*MAX_THREADS_COUNT+tid);
+            ASSERT_EQ(i*MAX_THREADS_COUNT+tid, returnValue);
         }
     }
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "8 threads getting 100 ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << THREADS_COUNT << " threads getting " ELEMENTS_COUNT << ints per each: " << elapsed_time.count() << " seconds." << std::endl;
 }
 
 

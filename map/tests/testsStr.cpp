@@ -5,6 +5,8 @@
 #include <ctime>
 #include <string.h>
 
+#define ELEMENTS_COUNT 10000
+#define THREADS_COUNT 8
 
 struct root {
     pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmapString;
@@ -22,47 +24,47 @@ bool file_exists(const char *fname) {
 
 pmem::obj::persistent_ptr<root> root_ptr;
 
-void insertStrFromThread(int tid) {
-    for(int i = 100; i >= 0; i--) {
-        root_ptr->pmapString->insertNew(std::to_string(i*64+tid), std::to_string(i*64+tid));
+void insertFromThread(int tid) {
+    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+        root_ptr->pmapString->insertNew(std::to_string(i*THREADS_COUNT+tid), std::to_string(i*THREADS_COUNT+tid));
     }
 }
 
-void removeStrFromThread(int tid) {
+void removeFromThread(int tid) {
     for(int i = 100; i >= 0; i--) {
         root_ptr->pmapString->remove(std::to_string(i*64+tid));
     }
 }
 
-TEST(NvmHashMapStr, Insert100Get100StrTest) {
-    for (int i = 100; i >= 0; i--) {
+TEST(NvmHashMapStr, InsertGetTest) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapString->insertNew(std::to_string(i), std::to_string(i+2));
     }
-    for (int i = 100; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         std::string returnValue = root_ptr->pmapString->get(std::to_string(i));
         ASSERT_EQ(std::to_string(i+2), returnValue);
     }
 }
 
-TEST(NvmHashMapStr, Insert100Remove100StrTest) {
-    for (int i = 100; i >= 0; i--) {
+TEST(NvmHashMapStr, InsertRemoveTest) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapString->insertNew(std::to_string(i), std::to_string(i+2));
     }
-    for (int i = 100; i >= 0; i--) {
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         std::string returnValue = root_ptr->pmapString->remove(std::to_string(i));
         ASSERT_EQ(std::to_string(i+2), returnValue);
     }
 }
 
-TEST(NvmHashMapStrParallel, Insert100Get100StrTest) {
-    std::thread t1(insertStrFromThread, 0);
-    std::thread t2(insertStrFromThread, 1);
-    std::thread t3(insertStrFromThread, 2);
-    std::thread t4(insertStrFromThread, 3);
-    std::thread t5(insertStrFromThread, 4);
-    std::thread t6(insertStrFromThread, 5);
-    std::thread t7(insertStrFromThread, 6);
-    std::thread t8(insertStrFromThread, 7);
+TEST(NvmHashMapStrParallel, InsertGetTest) {
+    std::thread t1(insertFromThread, 0);
+    std::thread t2(insertFromThread, 1);
+    std::thread t3(insertFromThread, 2);
+    std::thread t4(insertFromThread, 3);
+    std::thread t5(insertFromThread, 4);
+    std::thread t6(insertFromThread, 5);
+    std::thread t7(insertFromThread, 6);
+    std::thread t8(insertFromThread, 7);
 
     t1.join();
     t2.join();
@@ -73,24 +75,24 @@ TEST(NvmHashMapStrParallel, Insert100Get100StrTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = 100; i >= 0; i--) {
-            std::string returnValue = root_ptr->pmapString->get(std::to_string(i*64+tid));
-            ASSERT_EQ(std::to_string(i*64+tid), returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            std::string returnValue = root_ptr->pmapString->get(std::to_string(i*THREADS_COUNT+tid));
+            ASSERT_EQ(std::to_string(i*THREADS_COUNT+tid), returnValue);
         }
     }
 }
 
 
-TEST(NvmHashMapStrParallel, Insert100Remove100StrTest) {
-    std::thread t1(insertStrFromThread, 0);
-    std::thread t2(insertStrFromThread, 1);
-    std::thread t3(insertStrFromThread, 2);
-    std::thread t4(insertStrFromThread, 3);
-    std::thread t5(insertStrFromThread, 4);
-    std::thread t6(insertStrFromThread, 5);
-    std::thread t7(insertStrFromThread, 6);
-    std::thread t8(insertStrFromThread, 7);
+TEST(NvmHashMapStrParallel, InsertRemoveTest) {
+    std::thread t1(insertFromThread, 0);
+    std::thread t2(insertFromThread, 1);
+    std::thread t3(insertFromThread, 2);
+    std::thread t4(insertFromThread, 3);
+    std::thread t5(insertFromThread, 4);
+    std::thread t6(insertFromThread, 5);
+    std::thread t7(insertFromThread, 6);
+    std::thread t8(insertFromThread, 7);
 
     t1.join();
     t2.join();
@@ -101,10 +103,10 @@ TEST(NvmHashMapStrParallel, Insert100Remove100StrTest) {
     t7.join();
     t8.join();
 
-    for (int tid = 0; tid < 8; tid++) {
-        for (int i = 100; i >= 0; i--) {
-            std::string returnValue = root_ptr->pmapString->remove(std::to_string(i*64+tid));
-            ASSERT_EQ(std::to_string(i*64+tid), returnValue);
+    for (int tid = 0; tid < THREADS_COUNT; tid++) {
+        for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+            std::string returnValue = root_ptr->pmapString->remove(std::to_string(i*THREADS_COUNT+tid));
+            ASSERT_EQ(std::to_string(i*THREADS_COUNT+tid), returnValue);
         }
     }
 }
