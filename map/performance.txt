@@ -1,2 +1,15 @@
-8 threads inserting 100 ints per each 0.00659636 seconds.
-8 threads getting 100 ints per each: 0.000716897 seconds.
+16 threads inserting 10000 ints per each 0.435725 seconds.
+16 threads getting 10000 ints per each: 0.0290276 seconds.
+16 threads removing 10000 ints per each: 0.268972 seconds.
+8 threads inserting 10000 ints per each 0.192596 seconds.
+8 threads getting 10000 ints per each: 0.0123887 seconds.
+8 threads removing 10000 ints per each: 0.113308 seconds.
+4 threads inserting 10000 ints per each 0.124624 seconds.
+4 threads getting 10000 ints per each: 0.00932995 seconds.
+4 threads removing 10000 ints per each: 0.0895567 seconds.
+2 threads inserting 10000 ints per each 0.0768553 seconds.
+2 threads getting 10000 ints per each: 0.00536496 seconds.
+2 threads removing 10000 ints per each: 0.0451122 seconds.
+1 threads inserting 10000 ints per each 0.0576408 seconds.
+1 threads getting 10000 ints per each: 0.00248201 seconds.
+1 threads removing 10000 ints per each: 0.0339496 seconds.
