@@ -117,24 +117,24 @@ TEST(NvmHashMapIntParallel, InsertRemoveTest) {
     }
 }
 
-//TEST(NvmHashMapIntParallel, Insert100IterateCheckSumTest) {
-//    std::thread t1(insertIntFromThread, 0);
-//    t1.join();
-//
-//
-//    std::thread t2(iterateThread, 1);
-//    std::thread t3(iterateThread, 2);
-//
-//    t2.join();
-//    t3.join();
+TEST(NvmHashMapIntParallel, InsertIterateCheckSumTest) {
+    std::thread t1(insertFromThread, 0);
+    t1.join();
 
-//for (int tid = 0; tid < 8; tid++) {
-//for (int i = 100; i >= 0; i--) {
-//int returnValue = root_ptr->pmapInt->get(i*64+tid);
-//ASSERT_EQ(i*64+tid, returnValue);
-//}
-//}
-//}
+    int sum = 0;
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+        sum += i*THREADS_COUNT + 28;
+    }
+
+    int sumIterate = 0;
+    Iterator<int,int> it(root_ptr->pmapInt);
+    std::cout << it.get() << std::endl;
+    while (it.next()) {
+        sumIterate += it.get();
+    }
+
+    ASSERT_EQ(sum, sumIterate);
+}
 
 
 int main(int argc, char *argv[]) {
