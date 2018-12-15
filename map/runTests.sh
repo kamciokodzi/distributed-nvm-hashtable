@@ -4,7 +4,7 @@ make
 cd -
 make
 sudo rm -rf /mnt/mem/file*
-sudo ./runTestsStr /mnt/mem/fileStr
+sudo tests/runTestsStr /mnt/mem/fileStr
 sudo rm -rf /mnt/mem/file*
 sudo tests/runTestsInt /mnt/mem/fileInt
 sudo rm -rf /mnt/mem/file*

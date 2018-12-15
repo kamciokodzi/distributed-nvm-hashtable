@@ -42,6 +42,29 @@ void removeFromThread(int tid)
     }
 }
 
+
+TEST(NvmHashMapIntParallel, InsertIterateCheckSumTest) {
+    std::thread t1(insertFromThread, 0);
+    t1.join();
+
+    int sum = 0;
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+        sum += i*THREADS_COUNT;
+    }
+
+    int count = 0;
+    int sumIterate = 0;
+    Iterator<int,int> it(root_ptr->pmapInt);
+
+    while (it.next()) {
+        sumIterate += it.get();
+        count += 1;
+    }
+
+    ASSERT_EQ(sum, sumIterate);
+    ASSERT_EQ(ELEMENTS_COUNT, count);
+}
+
 TEST(NvmHashMapInt, InsertGetTest) {
     for (int i = ELEMENTS_COUNT; i >= 0; i--) {
         root_ptr->pmapInt->insertNew(i, i+2);
@@ -116,26 +139,6 @@ TEST(NvmHashMapIntParallel, InsertRemoveTest) {
         }
     }
 }
-
-TEST(NvmHashMapIntParallel, InsertIterateCheckSumTest) {
-    std::thread t1(insertFromThread, 0);
-    t1.join();
-
-    int sum = 0;
-    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
-        sum += i*THREADS_COUNT + 28;
-    }
-
-    int sumIterate = 0;
-    Iterator<int,int> it(root_ptr->pmapInt);
-    std::cout << it.get() << std::endl;
-    while (it.next()) {
-        sumIterate += it.get();
-    }
-
-    ASSERT_EQ(sum, sumIterate);
-}
-
 
 int main(int argc, char *argv[]) {
 
