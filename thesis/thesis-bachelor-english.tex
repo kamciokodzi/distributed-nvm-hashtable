@@ -1,0 +1,46 @@
+\documentclass[english,bachelor,a4paper,oneside]{ppfcmthesis}
+
+\usepackage[utf8]{inputenc}
+\usepackage[OT4]{fontenc}
+
+% Authors here.
+\author{%
+   Kamil Kołodziej \album{127272} \and 
+   Kinga Neumann \album{127224} \and 
+   Miłosz Pogodski \album{127206} \and 
+   Patryk Stasiewski \album{127281}}
+\title{NVM-enabled Distributed Hash Table system}
+\ppsupervisor{dr ~inż.~Tadeusz Kobus, mgr inż.~Maciej Kokociński}
+
+\ppyear{2019}                                         
+
+\begin{document}
+
+% Front matter starts here
+\frontmatter\pagestyle{empty}%
+\maketitle\cleardoublepage%
+
+% Blank info page for "karta dyplomowa"
+\thispagestyle{empty}\vspace*{\fill}%
+\begin{center}Tutaj przychodzi karta pracy dyplomowej;\\oryginał wstawiamy do wersji dla archiwum PP, w pozostałych kopiach wstawiamy ksero.\end{center}%
+\vfill\cleardoublepage%
+
+% Table of contents.
+\pagenumbering{Roman}\pagestyle{ppfcmthesis}%
+\tableofcontents* \cleardoublepage%
+
+% Main content of your thesis starts here.
+\mainmatter%
+\input{first-chapter.tex}
+
+% All appendices and extra material, if you have any.
+\cleardoublepage\appendix%
+%\input{0a-appendix.tex}
+
+% Bibliography (books, articles) starts here.
+\bibliographystyle{alpha}{\raggedright\sloppy\small\bibliography{bibliography}}
+
+% Colophon is a place where you should let others know about copyrights etc.
+\ppcolophon
+
+\end{document}
