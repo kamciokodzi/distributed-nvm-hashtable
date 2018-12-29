@@ -3,18 +3,53 @@
 
 \section{NVM-enabled hashtable}
 
+\subsection{Concept}
+
+    The first task we set for ourselves was to create a hashmap interface with enabled non-volatile memory and support for concurrency. The structure was supposed to have basic operations such as: insert, get, remove, iterate, and to have the ability to expand. 
+    
+    We created an NvmHashMap class which consists of pointers to two same-size dynamic arrays. The first one, called Array of Segments, is used to store the actual data. The use of an array allows to isolate the work of all threads from each other or split it in an even way between them. Array of Segments size depends on threads count, is stated by user and rounded to the next power of two. If not specified, it is set to 8 by default. The second array is called Array of Mutex and as the name suggests, is used to control concurrency. This way if more than one thread is working on a current segment, it locks the section what allows the rest of threads to perform normally. 
+    
+
 \subsection{Tests}
 
-    To ensure that our hashtable works correctly, we developed a range of unit tests. As previously stated, we used the GoogleTest library. We decided to split our tests into two categories: logic and perfomance.
+    To ensure that our hashtable works correctly, we developed a range of unit tests. As previously stated, we used the GoogleTest library. We decided to split our tests into two categories: logic and performance.
     
-    Logic tests try to verify the correctness of basic operands used in our hashtable: insert, get, remove and iterate. We run them on two instances of hashtable: integer and string type. In first test we add a number of elements with known sum. Then we start iterating through hashmap, at the same time summing elements. At the end with assert we check for equality of those two sums. Next tests concentrates on insert, get and remove functionalities. We decided to verify them both in single such as multithread mode (using 8 threads), where one thread inserts 100 thousand elements. After completing the addition, in one test case we try to get previously added elements, while in the second one we try to remove them. For each element we compare received value with added one using an assert.
+    Logic tests try to verify the correctness of basic operatations used in our hashtable: insert, get, remove and iterate. We run them on two instances of hashtable: integer and string type. In first test we add a number of elements with a known sum. Then we iterate through the hashmap, at the same time summing elements. At the end with an assert we check for the equality of those two sums. Next tests concentrate on insert, get and remove functionalities. We decided to verify them both in single such as multithread mode (using 8 threads), where one thread inserts 100 thousand elements. After completing the addition, in one test case we try to get previously added elements, while in the second one we try to remove them. For each element we compare received value with added one using an assert.
     
-    In performance tests we concentrated on comparing the effectiveness of our hashtable with \textit{unordered\_map} from std namespace. We measured time for 8 threads to insert, get and remove elements. We conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread.
-    
-    
-    
+    In performance tests we concentrated on comparing the effectiveness of our hashtable with \textit{unordered\_map} from std namespace. We measured time for 8 threads to insert, get and remove 100 000 elements. We conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
 
-        
+    \begin{table}[h]
+    \caption{Time measurements for basic operations such as insert, get and delete, comparing the NVM-enabled hashtable with unordered map}\label{tab:tabela}
+    \centering\footnotesize%
+        \begin{tabular}{|c|c|c|c|} 
+            \toprule
+            Number of threads & Operation & NVM-enabled hashmap - time [s] & Unordered map - time [s] \\
+            \midrule
+            16 & insert & 0.418 & \\
+            16 & get & 0.031 &    \\
+            16 & delete & 0.25 &  \\
+            \midrule
+            8 & insert & 0.183 &  \\
+            8 & get & 0.013 &     \\
+            8 & delete & 0.114 &  \\
+            \midrule
+            4 & insert & 0.109 &  \\
+            4 & get & 0.006 &     \\
+            4 & delete & 0.052 &  \\
+            \midrule
+            2 & insert & 0.057 &  \\
+            2 & get & 0.003 &     \\
+            2 & delete & 0.037 &  \\
+            \midrule
+            1 & insert & 0.048 &  \\
+            1 & get & 0.003 &     \\
+            1 & delete & 0.033 &  \\
+            \bottomrule
+        \end{tabular}
+    \end{table}
+
+    One of problems encountered while developing unit tests was the non-volatile nature of the data. After one finished test the program was still keeping previously added values in the memory. If we tested inserting in the next test case, we could not have been sure whether it worked properly or the program referred to previous values. Since the tests job was to detect if our code works correctly, we could not rely on implemented functionalities to delete all values before next test. We opted for a solution in which each test runs in a separate test case. That way we can delete files and clear memory in between tests.
+
     
 
 % Rozdziały dokumentujące pracę własną studenta: opisujące ideę, sposób lub metodę 
