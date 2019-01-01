@@ -3,12 +3,38 @@
 
 \section{NVM-enabled hashtable}
 
-\subsection{Concept}
+\subsection{Structure}
 
-    The first task we set for ourselves was to create a hashmap interface with enabled non-volatile memory and support for concurrency. The structure was supposed to have basic operations such as: insert, get, remove, iterate, and to have the ability to expand. 
+    The first task we set for ourselves was to create a hashmap with enabled non-volatile memory and support for concurrency. The structure was supposed to have basic operations such as: insert, get, remove, iterate, and to have the ability to expand. 
     
-    We created an NvmHashMap class which consists of pointers to two same-size dynamic arrays. The first one, called Array of Segments, is used to store the actual data. The use of an array allows to isolate the work of all threads from each other or split it in an even way between them. Array of Segments size depends on threads count, is stated by user and rounded to the next power of two. If not specified, it is set to 8 by default. The second array is called Array of Mutex and as the name suggests, is used to control concurrency. This way if more than one thread is working on a current segment, it locks the section what allows the rest of threads to perform normally. 
+    We created an NvmHashMap class which consists of pointers to two same-size dynamic arrays. The first one, called Array of Segments, is used to store the actual data. The use of an array allows to isolate the work of all threads from each other or split it in an even way between them. Array of Segments size is called internal maps count. It depends on the number of threads, is stated by user and is rounded to the next power of two. If not specified, it is set to 8 by default. The second array is called Array of Mutex and as the name suggests, is used to control concurrency. This way if more than one thread is working on a current segment, it locks the section what allows the rest of threads to perform normally. 
     
+    Each cell of the Array of Segments is composed of many lists which we call Segments. The actual members of the Array of Segments class are: inner array size, elements count - how many elements there are in all lists in a current cell and a pointer to the first element of the list. 
+    At the beginning there are 16 arrays in each cell of the Array of Segments. As you add items, the number of the arrays increases as a result of the expanding function which is covered in section % todo: update section nr.
+    The elements count is set to 0 at the beginning. It is used for measuring whether it is a proper time to execute an expand.
+    
+    The class called Segment consists of a hash value which is an integer, size and a pointer to the head of the list. Each element of the list is composed of key, value and a pointer to the next element. 
+    
+\subsection{Hashing function}
+    As the keys on which we operate are generic type, we have to provide a generic hashing function. We use the one from the std namespace. The result we got is then casted to unsigned long long integer. At the end we return an absolute value of the hashed key.  
+    
+\subsection{Insert}
+    While inserting an element, the first thing to do is to find a proper cell in Array of Segments. We do that by hashing the key of the inserted element and executing a logical and on both the hash and the number of the internal maps count decreased by 1. Once we know on which map we should work, we lock a corresponding lock to this map. Before inserting we check whether we should execute the expanding function. If not, we proceed straight to inserting the item into the internal map.
+        
+    At first we hash the key again, in order to then shift it right by a logarithm of the internal maps count places bitwise. Once we divide modulo the result by the current map size, we have an index of a segment to which we should insert the element. At first we assign the hash value to the current list in case it is the first element. Then we iterate through the list. If we find an existing element with the same key, we update it with a current value. If the list is empty, we put our item in the first place, and if it is not - we append it to the end.
+        
+    Once the addition was successful, we increment the elements count by one. The important thing is to carry out all these operations in a transaction. By doing this we provide the consistency of our hashmap.
+        
+\subsection{Get and remove}
+    Both get and remove functions work similarly. Just like when adding, in the beginning we calculate two indexes. The first one of a correct internal Map by performing a logical and on the hashed key and the internal maps count decreased by 1. The second index is a result of the hash shifted bitwise and divided modulo.
+        
+    Having these two indexes computed, we lock a corresponding mutex and we begin to iterate over the list. Once the item is found, we simply return it in the get function, while in remove function we start a transaction. We delete an item from the list and decrease its size by 1.
+        
+    % to-do: what if we don't find the element?
+        
+\subsection{Iterate}
+    
+\subsection{Expand}
 
 \subsection{Tests}
 
@@ -16,7 +42,7 @@
     
     Logic tests try to verify the correctness of basic operatations used in our hashtable: insert, get, remove and iterate. We run them on two instances of hashtable: integer and string type. In first test we add a number of elements with a known sum. Then we iterate through the hashmap, at the same time summing elements. At the end with an assert we check for the equality of those two sums. Next tests concentrate on insert, get and remove functionalities. We decided to verify them both in single such as multithread mode (using 8 threads), where one thread inserts 100 thousand elements. After completing the addition, in one test case we try to get previously added elements, while in the second one we try to remove them. For each element we compare received value with added one using an assert.
     
-    In performance tests we concentrated on comparing the effectiveness of our hashtable with \textit{unordered\_map} from std namespace. We measured time for 8 threads to insert, get and remove 100 000 elements. We conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
+    In performance tests we concentrated on comparing the effectiveness of our hashtable with \textit{unordered\_map} from the std namespace. We measured time for 8 threads to insert, get and remove 100 000 elements. We conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
 
     \begin{table}[h]
     \caption{Time measurements for basic operations such as insert, get and delete, comparing the NVM-enabled hashtable with unordered map}\label{tab:tabela}
