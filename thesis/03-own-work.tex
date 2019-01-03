@@ -5,46 +5,51 @@
 
 \subsection{Structure}
 
-    The first task we set for ourselves was to create a hashmap with enabled non-volatile memory and support for concurrency. The structure was supposed to have basic operations such as: insert, get, remove, iterate, and to have the ability to expand. 
+    The first task to do was to create a hashmap with enabled non-volatile memory and support for concurrency. The structure was supposed to have basic operations such as: insert, get, remove, iterate, and to have the ability to expand. 
     
-    We created an NvmHashMap class which consists of pointers to two same-size dynamic arrays. The first one, called the Array of Segments, is used to store the actual data. The use of an array allows to isolate the work of all threads from each other or at least split it in an even way between them. The Array of Segments size is called the internal maps count. It depends on the number of threads, is stated by user and rounded to the next power of two. If not specified, it is set to 8 by default. The second array is called the Array of Mutex and as the name suggests, is used to control concurrency. That way if one thread is performing one of operations, it locks just the segment it works on instead of the whole hashmap. This allows the threads working on different segments to perform concurrently.  
+    The NvmHashMap class consists of pointers to two same-size dynamic arrays. The first one, called the Array of Segments, is used to store the actual data. The use of an array allows to isolate the work of all threads from each other or at least split it in an even way between them. The Array of Segments size is called the internal maps count. It depends on the number of threads, is stated by user and rounded to the next power of two. If not specified, it is set to 8 by default. The second array is called the Array of Mutex and as the name suggests, is used to control concurrency. That way if one thread is performing one of operations, it locks just the segment it works on instead of the whole hashmap. This allows the threads working on different segments to perform concurrently.  
     
-    Each cell of the Array of Segments is composed of many lists which we call Segments. The actual members of the Array of Segments class are: inner array size, elements count - how many elements there are in all lists in a current cell and a pointer to the first element of the list. 
-    At the beginning there are 16 arrays in each cell of the Array of Segments. As you add items, the number of the arrays increases as a result of the expanding function which we covered in section 3.1.6
+    Each cell of the Array of Segments is composed of many lists which are call Segments. The actual members of the Array of Segments class are: inner array size, elements count - how many elements there are in all lists in a current cell and a pointer to the first element of the list. 
+    At the beginning there are 16 arrays in each cell of the Array of Segments. When adding items, the number of the arrays increases as a result of the expanding function which is covered in section 3.1.6
     The elements count is set to 0 at the beginning. It is used for measuring whether it is a proper time to execute an expand.
     
     The class called Segment consists of a hash value which is an integer, size and a pointer to the head of the list. Each element of the list is composed of key, value and a pointer to the next element. 
     
 \subsection{Hashing function}
-    As the keys on which we operate are generic type, we have to provide a generic hashing function. We use the one from the std namespace. The result we got is then casted to unsigned long long integer. At the end we return an absolute value of the hashed key.
+    As the operations are performed on generic type keys, the hashing function has to support that. A chosen solution was a hash function from the std namespace. The result obtained is then casted to unsigned long long integer. At the end the function returns an absolute value of the hashed key.
     
 \subsection{Insert}
-    While inserting an element, the first thing to do is to find a proper cell in the Array of Segments. We do that by hashing the key of the inserted element and executing a logical and on both the hash and the number of the internal maps count decreased by 1. Once we know on which map we should work, we lock a corresponding lock to this map. Before inserting we check whether we should execute the expanding function. If not, we proceed straight to inserting the item into the internal map.
+    While inserting an element, the first thing to do is to find a proper cell in the Array of Segments. It is done by hashing the key of the inserted element and executing a logical and on both the hash and the number of the internal maps count decreased by 1. Once the map on which work should be performed is known, the program locks a corresponding mutex to this map. Before inserting it is checked whether the expanding function should be executed. If not, it is proceeded straight to inserting the item into the internal map.
         
-    At first we hash the key again, in order to then shift it right by a logarithm of the internal maps count places bitwise. Once we divide modulo the result by the current map size, we have an index of a segment to which we should insert the element. At first we assign the hash value to the current list in case it is the first element. Then we iterate through the list. If we find an existing element with the same key, we update it with a current value. If the list is empty, we put our item in the first place, and if it is not - we append it to the end.
+    At first key is hashed again, in order to then be shifted right by a logarithm of the internal maps count places bitwise. Once it is divided modulo by the current map size, the result is an index of a segment to which the element should be inserted. The next thing is to assign the hash value to the current list in case it is the first element. Then the program starts iterate through the list. If it finds an existing element with the same key, it updates it with a current value. If the list is empty, it puts the item in the first place, and if it is not - it appends it to the end.
         
-    Once the addition was successful, we increment the elements count by one. The important thing is to carry out all these operations in a transaction. This way if for example we fail while adding an element, the size will not be increased. By doing this we provide the consistency of our hashmap.
+    Once the addition was successful, it increments the elements count by one. The important thing is to carry out all these operations in a transaction. This way if there is some failure while adding an element, the size will not be increased. By doing this the consistency of the hashmap is provided.
         
 \subsection{Get and remove}
-    Both get and remove functions work similarly. Just like when adding, in the beginning we calculate two indexes: the first one of a internal map corresponding to current thread and the second - of the right segment in this map. 
+    Both get and remove functions work similarly. Just like when adding, in the beginning two indexes are calculated: the first one of a internal map corresponding to current thread and the second - of the right segment in this map. 
     % by performing a logical and on the hashed key and the internal maps count decreased by 1. The second index is a result of the hash shifted bitwise and divided modulo.
         
-    Having these two indexes computed, we lock a corresponding mutex and we begin to iterate over the list. Once the item is found, we simply return it in the get function, while in remove function we start a transaction. We delete an item from the list and decrease its size by 1.
+    Having these two indexes computed, a corresponding mutex is locked and the function begins to iterate over the list. Once the item is found, it simply returns its value in "get" case, while in "remove" it starts a transaction. It deletes an item from the list and decreases its size by 1.
         
-    % to-do: what if we don't find the element?
+    % to-do: what if the element is not found?
         
 \subsection{Iterate}
     
 \subsection{Expand}
-    As we mentioned above, the expanding function is performed while inserting an element on a certain condition. In order for an internal map to resize, one of its segments has to contain over 70\% of the elements. We check that requirement only for the segment to which we are adding an element. Once that condition is met, we allocate memory for the new array of segments with 4 times bigger size. Then we iterate through the old map in order to insert all previously added elements to the new one. We use the exactly same function as described in section 3.1.3. This way after resizing all items have a newly calculated hash therefore their place in the hashmap has changed.
+    As mentioned above, the expanding function is performed while inserting an element on a certain condition. In order for an internal map to resize, one of its segments has to contain over 70\% of the elements. That requirement is checked only for the segment to which an element is being added. Once that condition is met, the program allocates memory for the new array of segments with 4 times bigger size. Then it iterates through the old map in order to insert all previously added elements to the new one. It uses for this purpose the exactly same function as described in section 3.1.3. This way all items have a newly calculated hash after resizing and therefore are evenly distributed in the array.
 
-\subsection{Tests}
+\subsection{Logic tests}
+    To ensure that the hashtable works correctly, a range of unit tests was developed. As previously stated, the GoogleTest library was used. Logic tests try to verify the correctness of implemented operations: insert, get, remove and iterate. They are run on two instances of hashtable: integer and string type. 
+    
+    The first test inserts a number of elements with a known sum. Then it iterates through the hashmap, at the same time summing elements. At the end with an assert it checks for the equality of those two sums. 
+    
+    Next tests concentrate on insert, get and remove functions. It has been decided to verify them both in single- such as multi-threaded mode (using 8 threads), where one thread inserts 100000 elements. After completing the addition, one test case tries to get previously added values, while the second one tries to remove them. In order for the test to pass, all inserted items need to be either found or deleted. Considering the fact that both get and remove function returns a value of an element identified by a key, for each case the received value is compared with the added one using an assert.
+    
+    One of problems encountered while developing unit tests was the non-volatile nature of the data. After one finished test the program was still keeping previously added values in the memory. If the inserting functionality was the main purpose of the next test case, it could not have been clear whether the program worked properly or it referred to previous values. Since the tests job was to detect if the code works correctly, implemented functions could not been relied to to delete all values before next test. The chosen solution was to run each each test in a separate test case. That way the files could have been deleted and the memory cleared in between tests.
+    
+\subsection{Performance tests}
 
-    To ensure that our hashtable works correctly, we developed a range of unit tests. As previously stated, we used the GoogleTest library. We decided to split our tests into two categories: logic and performance.
-    
-    Logic tests try to verify the correctness of basic operatations used in our hashtable: insert, get, remove and iterate. We run them on two instances of hashtable: integer and string type. In first test we add a number of elements with a known sum. Then we iterate through the hashmap, at the same time summing elements. At the end with an assert we check for the equality of those two sums. Next tests concentrate on insert, get and remove functionalities. We decided to verify them both in single such as multithread mode (using 8 threads), where one thread inserts 100 thousand elements. After completing the addition, in one test case we try to get previously added elements, while in the second one we try to remove them. For each element we compare received value with added one using an assert.
-    
-    In performance tests we concentrated on comparing the effectiveness of our hashtable with \textit{unordered\_map} from the std namespace. We measured time for 8 threads to insert, get and remove 100 000 elements. We conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
+    The performance tests concentrated on comparing the effectiveness of NVM-enabled hashtable with the \textit{unordered\_map} from the std namespace. They measured time for 8 threads to insert, get and remove 100000 elements. Then they conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
 
     \begin{table}[h]
     \caption{Time measurements for basic operations such as insert, get and delete, comparing the NVM-enabled hashtable with unordered map}\label{tab:tabela}
@@ -76,10 +81,6 @@
         \end{tabular}
     \end{table}
 
-    One of problems encountered while developing unit tests was the non-volatile nature of the data. After one finished test the program was still keeping previously added values in the memory. If we tested inserting in the next test case, we could not have been sure whether it worked properly or the program referred to previous values. Since the tests job was to detect if our code works correctly, we could not rely on implemented functionalities to delete all values before next test. We opted for a solution in which each test runs in a separate test case. That way we can delete files and clear memory in between tests.
-
-    
-
 % Rozdziały dokumentujące pracę własną studenta: opisujące ideę, sposób lub metodę 
 % rozwiązania postawionego problemu oraz rozdziały opisujące techniczną stronę rozwiązania 
 % --- dokumentacja techniczna, przeprowadzone testy, badania i uzyskane wyniki. 
@@ -107,16 +108,7 @@
 % Odwołania do wcześniejszych fragmentów tekstu powinny mieć następującą postać: ,,Jak wspomniano wcześniej, ....'', 
 % ,,Jak wykazano powyżej ....''. Należy unikać długich zdań. 
 
-% ,,Ilość'' i ,,liczba''. Proszę zauważyć, liczba dotyczy rzeczy policzalnych, np.~liczba osób, liczba zadań, procesorów. 
-% Ilość dotyczy rzeczy niepoliczalnych, np.~ilość wody, energii. Należy starać się wyrażać precyzyjnie, tj.~zgodnie 
-% z naturą liczonych obiektów.\footnote{(DW) Według wytycznych Rady Języka Polskiego obie formy są dopuszczalne
-% zarówno do obiektów policzalnych, jak i niepoliczalnych. W tekstach technicznych warto być jednak precyzyjnym.}
-
 % Niedopuszczalne są zwroty używane w języku potocznym. W pracy należy używać terminologii informatycznej, która ma 
 % sprecyzowaną treść i znaczenie. Nie należy używać ,,gazetowych'' określeń typu: 
 % silnik bazy danych, silnik programu, maszyna skryptowa, elektroniczny mechanizm, mapowanie, string, gdyż nie wiadomo 
 % co one właściwie oznaczają. 
-
-% Niedopuszczalne jest pisanie pracy metodą \emph{cut\&paste}, bo jest to plagiat i dowód intelektualnej indolencji autora.
-% Dane zagadnienie należy opisać własnymi słowami. Zawsze trzeba powołać się na zewnętrzne źródła. 
-
