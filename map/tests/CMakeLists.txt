@@ -11,6 +11,7 @@ add_executable(runTestsPerformance8 testsPerformance8.cpp)
 add_executable(runTestsPerformance4 testsPerformance4.cpp)
 add_executable(runTestsPerformance2 testsPerformance2.cpp)
 add_executable(runTestsPerformance1 testsPerformance1.cpp)
+add_executable(runTestsPerformanceUnordered testsPerformanceUnordered.cpp)
 
 # Link runTests with what we want to test and the GTest and pthread library
 target_link_libraries(runTestsInt ${GTEST_LIBRARIES} pthread  pmemobj pmem)
@@ -20,3 +21,4 @@ target_link_libraries(runTestsPerformance8 ${GTEST_LIBRARIES} pthread  pmemobj p
 target_link_libraries(runTestsPerformance4 ${GTEST_LIBRARIES} pthread  pmemobj pmem)
 target_link_libraries(runTestsPerformance2 ${GTEST_LIBRARIES} pthread  pmemobj pmem)
 target_link_libraries(runTestsPerformance1 ${GTEST_LIBRARIES} pthread  pmemobj pmem)
+target_link_libraries(runTestsPerformanceUnordered ${GTEST_LIBRARIES} pthread)

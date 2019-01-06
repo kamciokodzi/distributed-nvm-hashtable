@@ -17,6 +17,6 @@ sudo rm -rf /mnt/mem/file*
 sudo tests/runTestsPerformance2 /mnt/mem/filePerformance2
 sudo rm -rf /mnt/mem/file*
 sudo tests/runTestsPerformance1 /mnt/mem/filePerformance1
-
+sudo tests/runTestsPerformanceUnordered
 
 
