@@ -1,8 +1,12 @@
-sudo rm performance.txt
 cd tests
+mkdir -p results
+cd results
+sudo rm -f NvmHashMap.csv
+sudo rm -f UnorderedMap.csv
+sudo rm -f Combined.csv
+cd ..
 make
-cd -
-make
+cd ..
 sudo rm -rf /mnt/mem/file*
 sudo tests/runTestsStr /mnt/mem/fileStr
 sudo rm -rf /mnt/mem/file*
@@ -18,5 +22,6 @@ sudo tests/runTestsPerformance2 /mnt/mem/filePerformance2
 sudo rm -rf /mnt/mem/file*
 sudo tests/runTestsPerformance1 /mnt/mem/filePerformance1
 sudo tests/runTestsPerformanceUnordered
-
+cd tests/results
+paste -d, Outline.csv NvmHashMap.csv UnorderedMap.csv > Combined.csv
 

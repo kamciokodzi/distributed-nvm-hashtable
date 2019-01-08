@@ -1,4 +1,5 @@
 #include "../NvmHashMap.hpp"
+#include "constants.hpp"
 #include <gtest/gtest.h>
 #include <thread>
 #include <chrono>
@@ -6,8 +7,6 @@
 #include <string.h>
 #include <fstream>
 #include <unordered_map>
-
-#define ELEMENTS_COUNT 10000
 
 int threads_count = 16;
 std::unordered_map<int, int> unorderedMap;
@@ -36,8 +35,6 @@ void removeIntFromThreadUnordered(int tid)
 }
 
 TEST(UnorderedIntParallelPerformance, 16ThreadsInsertGetRemoveTest) {
-    outFile << std::endl;
-
     auto start = std::chrono::system_clock::now();
     std::thread t1(insertIntFromThreadUnordered, 0);
     t1.join();
@@ -73,7 +70,7 @@ TEST(UnorderedIntParallelPerformance, 16ThreadsInsertGetRemoveTest) {
     t16.join();
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(getIntFromThreadUnordered, 0);
@@ -110,7 +107,7 @@ TEST(UnorderedIntParallelPerformance, 16ThreadsInsertGetRemoveTest) {
     t16.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(removeIntFromThreadUnordered, 0);
@@ -147,7 +144,7 @@ TEST(UnorderedIntParallelPerformance, 16ThreadsInsertGetRemoveTest) {
     t16.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 }
 
 TEST(UnorderedIntParallelPerformance, 8ThreadsInsertGetRemoveTest) {
@@ -173,7 +170,7 @@ TEST(UnorderedIntParallelPerformance, 8ThreadsInsertGetRemoveTest) {
     t8.join();
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(getIntFromThreadUnordered, 0);
@@ -194,7 +191,7 @@ TEST(UnorderedIntParallelPerformance, 8ThreadsInsertGetRemoveTest) {
     t8.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(removeIntFromThreadUnordered, 0);
@@ -215,7 +212,7 @@ TEST(UnorderedIntParallelPerformance, 8ThreadsInsertGetRemoveTest) {
     t8.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 }
 
 TEST(UnorderedIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
@@ -232,7 +229,7 @@ TEST(UnorderedIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
     t4.join();
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(getIntFromThreadUnordered, 0);
@@ -245,7 +242,7 @@ TEST(UnorderedIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
     t4.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(removeIntFromThreadUnordered, 0);
@@ -258,7 +255,7 @@ TEST(UnorderedIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
     t4.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 }
 
 TEST(UnorderedIntParallelPerformance, 2ThreadsInsertGetRemoveTest) {
@@ -272,7 +269,7 @@ TEST(UnorderedIntParallelPerformance, 2ThreadsInsertGetRemoveTest) {
     t2.join();
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(getIntFromThreadUnordered, 0);
@@ -281,7 +278,7 @@ TEST(UnorderedIntParallelPerformance, 2ThreadsInsertGetRemoveTest) {
     t2.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(removeIntFromThreadUnordered, 0);
@@ -290,7 +287,7 @@ TEST(UnorderedIntParallelPerformance, 2ThreadsInsertGetRemoveTest) {
     t2.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 }
 
 TEST(UnorderedIntParallelPerformance, 1ThreadsInsertGetRemoveTest) {
@@ -302,27 +299,27 @@ TEST(UnorderedIntParallelPerformance, 1ThreadsInsertGetRemoveTest) {
     t1.join();
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(getIntFromThreadUnordered, 0);
     t1.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     t1 = std::thread(removeIntFromThreadUnordered, 0);
     t1.join();
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << "Unordered. " << threads_count << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
+    outFile << elapsed_time.count() << std::endl;
 }
 
 int main(int argc, char *argv[]) {
+    outFile.open(UNORDERED_FILE, std::ios_base::out);
 
-    outFile.open("performance.txt", std::ios_base::app);
-
+    outFile << "Unordered map - time [s]" << std::endl;
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 

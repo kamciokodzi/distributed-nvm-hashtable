@@ -1,4 +1,5 @@
 #include "../NvmHashMap.hpp"
+#include "constants.hpp"
 #include <gtest/gtest.h>
 #include <thread>
 #include <chrono>
@@ -6,7 +7,6 @@
 #include <string.h>
 #include <fstream>
 
-#define ELEMENTS_COUNT 10000
 #define THREADS_COUNT 4
 
 struct root {
@@ -62,8 +62,7 @@ TEST(NvmHashMapIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
 
     auto end = std::chrono::system_clock::now();
     std::chrono::duration<double> elapsed_time = end-start;
-    outFile << THREADS_COUNT <<" threads inserting " << ELEMENTS_COUNT << " ints per each " << elapsed_time.count() << " seconds." << std::endl;
-
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
 
@@ -78,8 +77,7 @@ TEST(NvmHashMapIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
 
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << THREADS_COUNT << " threads getting " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
-
+    outFile << elapsed_time.count() << std::endl;
 
     start = std::chrono::system_clock::now();
     
@@ -94,14 +92,13 @@ TEST(NvmHashMapIntParallelPerformance, 4ThreadsInsertGetRemoveTest) {
     
     end = std::chrono::system_clock::now();
     elapsed_time = end-start;
-    outFile << THREADS_COUNT << " threads removing " << ELEMENTS_COUNT << " ints per each: " << elapsed_time.count() << " seconds." << std::endl;
-
+    outFile << elapsed_time.count() << std::endl;
 }
 
 
 int main(int argc, char *argv[]) {
 
-    outFile.open("performance.txt", std::ios_base::app);
+    outFile.open(HASHMAP_FILE, std::ios_base::app);
 
     pmem::obj::pool <root> pop;
     std::string path = argv[1];
@@ -109,7 +106,7 @@ int main(int argc, char *argv[]) {
     try {
         if (!file_exists(path.c_str())) {
             pop = pmem::obj::pool<root>::create(path, "",
-                                                PMEMOBJ_MIN_POOL*16, (S_IWUSR|S_IRUSR));
+                                                PMEMOBJ_MIN_POOL*192, (S_IWUSR|S_IRUSR));
         } else {
             pop = pmem::obj::pool<root>::open(path, "");
         }

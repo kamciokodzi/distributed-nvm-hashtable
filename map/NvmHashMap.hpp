@@ -66,6 +66,11 @@ public:
         this->arraySize = arraySize;
         elementsCount = 0;
     }
+
+    ~ArrayOfSegments() {
+        pmem::obj::delete_persistent<Segment<K, V>[]>(this->segments);
+
+    }
 };
 
 template<class K, class V>
@@ -84,11 +89,11 @@ private:
         return this;
     }
 
-    int insertIntoInternalArray(K key, V value, ArrayOfSegments<K, V>& aos) {
+    int  insertIntoInternalArray(K key, V value, ArrayOfSegments<K, V>& aos) {
         int hash = this->hash(key);
         hash = hash >> int(std::log2(internalMapsCount));
 
-        int index2 = hash % aos.arraySize; //Important AFTER expand
+        int index2 = hash % aos.arraySize;
 
         aos.segments[index2].hash = hash;
         pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = aos.segments[index2].head;
@@ -184,7 +189,6 @@ public:
                 break;
             }
         }
-        std::cout << "\n\nget exception\n\n" << std::endl;
         throw "Did not found element";
     }
 
