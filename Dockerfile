@@ -1,6 +1,5 @@
 # Pull base image
 FROM fedora:28
-MAINTAINER marcin.slusarz@intel.com
 
 # Install basic tools
 RUN dnf update -y \
@@ -187,3 +186,4 @@ RUN dnf install -y libaio-devel \
 RUN ./install-dependencies.sh
 RUN ./configure.py
 RUN ninja -C build/release
+RUN dnf install -y nc
