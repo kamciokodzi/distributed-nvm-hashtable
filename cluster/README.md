@@ -2,6 +2,7 @@
 
 To build cluster project on docker use
 
-` sh build.sh `
-` cmake .. `
-` make `
+``` 
+sh build.sh 
+cmake .. 
+make ```
