@@ -7,3 +7,7 @@ sh build.sh
 cmake .. 
 make 
 ```
+To connect to cluster
+```
+--addr={ip}:{port}
+```
