@@ -27,7 +27,7 @@ class tcp_server {
 public:
     future<> listen(ipv4_addr addr) {
         if (enable_tcp) {
-            std::cout<< "Enable TCP" << std::endl;
+            //std::cout<< "Enable TCP" << std::endl;
             listen_options lo;
             lo.proto = transport::TCP;
             lo.reuse_address = true;
@@ -47,11 +47,33 @@ public:
         return make_ready_future<>();
     }
 
+    future<> connect(ipv4_addr server_addr) {
+
+        socket_address local = socket_address(::sockaddr_in{AF_INET, INADDR_ANY, {0}});
+        engine().net().connect(make_ipv4_address(server_addr), local, transport::TCP).then([this] (connected_socket fd) {
+            auto conn = new connection(std::move(fd));
+            conn->write("connect").then_wrapped([conn] (auto&& f) {
+                std::cout<<"closing"<<std::endl;
+                conn->read_once().then_wrapped([conn] (auto&& f) {
+                    delete conn;
+                    std::cout<<"conn closed"<<std::endl;
+                    try {
+                        f.get();
+                    } catch (std::exception& ex) {
+                        fprint(std::cerr, "request error: %s\n", ex.what());
+                    }
+                });
+            });
+        });
+
+        return make_ready_future();
+    }
+
     void do_accepts(std::vector<server_socket>& listeners) {
-        std::cout<< "Accept connections" << std::endl;
         int which = listeners.size() - 1;
-        std::cout<< "Which: " << which << std::endl;
+        //std::cout<< "Which: " << which << std::endl;
         listeners[which].accept().then([this, &listeners] (connected_socket fd, socket_address addr) mutable {
+            std::cout<< "Accept connection: " << addr << std::endl;
             auto conn = new connection(*this, std::move(fd), addr);
             conn->read().then_wrapped([conn] (auto&& f) {
                 try {
@@ -71,14 +93,22 @@ public:
     }
     class connection {
         connected_socket _fd;
+        socket_address _addr;
         input_stream<char> _read_buf;
         output_stream<char> _write_buf;
 
     public:
         connection(tcp_server& server, connected_socket&& fd, socket_address addr)
             : _fd(std::move(fd))
+            , _addr(addr)
             , _read_buf(_fd.input())
             , _write_buf(_fd.output()) {}
+
+        connection(connected_socket&& fd)
+            : _fd(std::move(fd))
+            , _read_buf(_fd.input())
+            , _write_buf(_fd.output()) {}
+
         future<> read() {
             if (_read_buf.eof()) {
                 return make_ready_future();
@@ -97,6 +127,34 @@ public:
                 });
             });
         }
+
+        future<> read_once() {
+            if (_read_buf.eof()) {
+                return make_ready_future();
+            }
+            // size_t n = 4;
+            return _read_buf.read().then([this] (temporary_buffer<char> buf) {
+                if (buf.size() == 0) {
+                    return make_ready_future();
+                }
+                auto cmd = std::string(buf.get(), buf.size());
+                std::cout<<cmd << std::endl;
+                // return _write_buf.write(cmd).then([this] {
+                //     return _write_buf.flush();
+                // }).then([this] {
+                //     return this->make_ready_future();
+                // });
+                return make_ready_future();
+            });
+        }
+
+        future<> write(std::string msg) {
+            return _write_buf.write(msg).then([this] {
+                return _write_buf.flush();
+            }).then([this] {
+                return make_ready_future<>();
+            });
+        }
     };
 };
 
@@ -106,22 +164,27 @@ int main(int ac, char** av) {
     app_template app;
     app.add_options()
         ("port", bpo::value<uint16_t>()->default_value(10000), "TCP server port")
-        ("tcp", bpo::value<std::string>()->default_value("yes"), "tcp listen");
+        ("tcp", bpo::value<std::string>()->default_value("yes"), "tcp listen")
+        ("addr", bpo::value<std::string>()->default_value(""), "Server address");
     return app.run_deprecated(ac, av, [&] {
         std::cout<<"AAAA"<<std::endl;
         auto&& config = app.configuration();
         uint16_t port = config["port"].as<uint16_t>();
         enable_tcp = config["tcp"].as<std::string>() == "yes";
+        auto addr = config["addr"].as<std::string>();
         if (!enable_tcp) {
             fprint(std::cerr, "Error: no protocols enabled. Use \"--tcp yes\" to enable\n");
             return engine().exit(1);
         }
 
         auto server = new distributed<tcp_server>;
-        server->start().then([server = std::move(server), port] () mutable {
+        server->start().then([server = std::move(server), port, addr] () mutable {
             engine().at_exit([server] {
                 return server->stop();
             });
+            if (addr.length() > 0) {
+                server->invoke_on(1, &tcp_server::connect, ipv4_addr{addr});
+            }
             server->invoke_on_all(&tcp_server::listen, ipv4_addr{port});
         }).then([port] {
             std::cout << "Seastar TCP server listening on port " << port << " ...\n";
