@@ -43,7 +43,7 @@ public:
     }
 
     future<> stop() {
-        std::cout<<"Stop connection" << std::endl;
+        //std::cout<<"Stop connection" << std::endl;
         return make_ready_future<>();
     }
 
@@ -53,7 +53,6 @@ public:
         engine().net().connect(make_ipv4_address(server_addr), local, transport::TCP).then([this] (connected_socket fd) {
             auto conn = new connection(std::move(fd));
             conn->write("connect").then_wrapped([conn] (auto&& f) {
-                std::cout<<"closing"<<std::endl;
                 conn->read_once().then_wrapped([conn] (auto&& f) {
                     delete conn;
                     std::cout<<"conn closed"<<std::endl;
@@ -120,6 +119,9 @@ public:
                 }
                 auto cmd = std::string(buf.get(), buf.size());
                 std::cout<<cmd << std::endl;
+                if (cmd == "connect") {
+                    std::cout << "New node" << std::endl;
+                }
                 return _write_buf.write(cmd).then([this] {
                     return _write_buf.flush();
                 }).then([this] {
@@ -183,7 +185,7 @@ int main(int ac, char** av) {
                 return server->stop();
             });
             if (addr.length() > 0) {
-                server->invoke_on(1, &tcp_server::connect, ipv4_addr{addr});
+                server->invoke_on(0, &tcp_server::connect, ipv4_addr{addr});
             }
             server->invoke_on_all(&tcp_server::listen, ipv4_addr{port});
         }).then([port] {
