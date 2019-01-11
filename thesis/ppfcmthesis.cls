@@ -121,7 +121,7 @@ Poznan University of Technology\\Faculty of Computer Science and Management\\Ins
 
 \renewcommand{\maketitlehookc}{\vfill\begin{center}
 \if@pppolish
-Promotor\\\@ppsupervisor
+Promotorzy\\\@ppsupervisor
 \else
 Supervisors\\\@ppsupervisor
 \fi\end{center}
@@ -256,4 +256,3 @@ Typeset using \LaTeX\ in Computer Modern.
 
 % Table head
 \newcolumntype{L}{c}\newcommand{\tabhead}[1]{\multicolumn{1}{L}{#1}}
-
