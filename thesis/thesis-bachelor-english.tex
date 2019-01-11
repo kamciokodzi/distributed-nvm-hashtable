@@ -2,6 +2,9 @@
 
 \usepackage[utf8]{inputenc}
 \usepackage[OT4]{fontenc}
+\usepackage{listings}
+\usepackage{xspace}
+\usepackage{macros}
 
 % Authors here.
 \author{%
@@ -14,7 +17,19 @@
 
 \ppyear{2019}                                         
 
+
 \begin{document}
+
+% Listings
+\lstset{
+    frame=tb, % draw a frame at the top and bottom of the code block
+    tabsize=4, % tab space width
+    showstringspaces=false, % don't mark spaces in strings
+    numbers=left, % display line numbers on the left
+    commentstyle=\color{green}, % comment color
+    keywordstyle=\color{blue}, % keyword color
+    stringstyle=\color{red} % string color
+}
 
 % Front matter starts here
 \frontmatter\pagestyle{empty}%
