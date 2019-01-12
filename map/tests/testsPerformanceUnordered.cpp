@@ -14,14 +14,14 @@ std::ofstream outFile;
 
 void insertIntFromThreadUnordered(int tid)
 {
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         unorderedMap.insert(std::make_pair(i*threads_count+tid, i*threads_count+tid));
     }
 }
 
 void getIntFromThreadUnordered(int tid)
 {
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         unorderedMap.find(i*threads_count+tid);
     }
 }
@@ -29,7 +29,7 @@ void getIntFromThreadUnordered(int tid)
 void removeIntFromThreadUnordered(int tid)
 {
 
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         unorderedMap.erase(i*threads_count+tid);
     }
 }
