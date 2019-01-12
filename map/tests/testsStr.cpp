@@ -5,7 +5,8 @@
 #include <ctime>
 #include <string.h>
 
-#define ELEMENTS_COUNT 10000
+
+#define ELEMENTS_COUNT 1000
 #define THREADS_COUNT 8
 
 struct root {
@@ -35,6 +36,32 @@ void removeFromThread(int tid) {
         root_ptr->pmapString->remove(std::to_string(i*64+tid));
     }
 }
+
+TEST(NvmHashMapStrParallel, InsertIterateCheckSumTest) {
+    std::thread t1(insertFromThread, 0);
+    t1.join();
+
+    int sum = 0;
+    for (int i = ELEMENTS_COUNT; i >= 0; i--) {
+        sum += i*THREADS_COUNT;
+    }
+
+    int count = 0;
+    int sumIterate = 0;
+    Iterator<std::string, std::string> it(root_ptr->pmapString);
+
+    sumIterate += std::stoi(it.get());
+
+    while (it.next()) {
+        sumIterate += std::stoi(it.get());
+        count += 1;
+
+    }
+
+    ASSERT_EQ(sum, sumIterate);
+    ASSERT_EQ(ELEMENTS_COUNT, count);
+}
+
 
 TEST(NvmHashMapStr, InsertGetTest) {
     for (int i = ELEMENTS_COUNT; i >= 0; i--) {
@@ -122,7 +149,7 @@ int main(int argc, char *argv[]) {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool"<<std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                                                PMEMOBJ_MIN_POOL*16, (S_IWUSR|S_IRUSR));
+                                                PMEMOBJ_MIN_POOL*192, (S_IWUSR|S_IRUSR));
         } else {
             std::cout << "File exists, opening pool"<<std::endl;
             pop = pmem::obj::pool<root>::open(path, "");

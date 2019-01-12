@@ -4,14 +4,10 @@
 #include <chrono>
 #include <ctime>
 #include <string.h>
-#include <future>
 
 #define ELEMENTS_COUNT 10000
 #define THREADS_COUNT 8
 
-void func(std::promise<int> && p) {
-    p.set_value(1);
-}
 struct root {
     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmapInt;
 };
@@ -55,6 +51,7 @@ TEST(NvmHashMapIntParallel, InsertIterateCheckSumTest) {
     int count = 0;
     int sumIterate = 0;
     Iterator<int,int> it(root_ptr->pmapInt);
+    sumIterate += it.get();
 
     while (it.next()) {
         sumIterate += it.get();
@@ -149,7 +146,7 @@ int main(int argc, char *argv[]) {
         if (!file_exists(path.c_str())) {
             std::cout << "File doesn't exists, creating pool"<<std::endl;
             pop = pmem::obj::pool<root>::create(path, "",
-                                                PMEMOBJ_MIN_POOL*16, (S_IWUSR|S_IRUSR));
+                                                PMEMOBJ_MIN_POOL*192, (S_IWUSR|S_IRUSR));
         } else {
             std::cout << "File exists, opening pool"<<std::endl;
             pop = pmem::obj::pool<root>::open(path, "");

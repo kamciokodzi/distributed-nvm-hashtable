@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
     }
 
     testing::InitGoogleTest(&argc, argv);
-    outFile << "NVM-enabled hashmap - time [s]" << std::endl;
+    outFile << std::endl;
     return RUN_ALL_TESTS();
 
 }
