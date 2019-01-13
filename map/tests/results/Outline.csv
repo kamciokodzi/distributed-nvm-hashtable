@@ -1,20 +1,20 @@
 Number of threads,Operation
-16,insert
-16,get
-16,delete
-
-8,insert
-8,get
-8,delete
-
-4,insert
-4,get
-4,delete
+1,insert
+1,get
+1,delete
 
 2,insert
 2,get
 2,delete
 
-1,insert
-1,get
-1,delete
+4,insert
+4,get
+4,delete
+
+8,insert
+8,get
+8,delete
+
+16,insert
+16,get
+16,delete

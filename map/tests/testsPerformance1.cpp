@@ -28,21 +28,21 @@ std::ofstream outFile;
 
 void insertIntFromThread(int tid)
 {
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         root_ptr->pmapInt->insertNew(i*THREADS_COUNT+tid, i*THREADS_COUNT+tid);
     }
 }
 
 void removeIntFromThread(int tid)
 {
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         root_ptr->pmapInt->remove(i*THREADS_COUNT+tid);
     }
 }
 
 void getIntFromThread(int tid)
 {
-    for(int i = ELEMENTS_COUNT; i >= 0; i--) {
+    for(int i = ELEMENTS_COUNT_PERFORMANCE; i >= 0; i--) {
         root_ptr->pmapInt->get(i*THREADS_COUNT+tid);
     }
 }
@@ -101,7 +101,6 @@ int main(int argc, char *argv[]) {
     }
 
     testing::InitGoogleTest(&argc, argv);
-    outFile << std::endl;
+    outFile << "NVM-enabled hashmap - time [s]" << std::endl;
     return RUN_ALL_TESTS();
-
 }

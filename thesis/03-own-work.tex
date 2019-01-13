@@ -1,63 +1,326 @@
+% \tk{use texttt, emph, textbf when needed}
+% \tk{Top tip: use macros - see the definition above. It's often good to have a separate tex file with all macros, the file is included prior all other tex files in a document.}
+
 \chapter{NVM-enabled hashmap}
-In this chapter we will discuss the key component of our system which allows us to reliably manage data locally using the non volatile memory. 
+In this chapter we will discuss the key component of our system which allows us to reliably manage data locally using the non-volatile memory. 
 
 \section{Assumptions}
-    The NvmHashMap is an associative structure containing pairs of generic keys and values. The keys are unique for each item and allow its unambiguous identification. The elements position in the structure is defined by a hash value of the element key. The hash map interface is implemented similarly to the generic ConcurrentHashMap in Java, providing an Iterator object and basic operations such as: insert, get or remove. 
+    % \tk{What is NvmHashMap? First say that you want to store data in a hashmap. Afterall it's a natural choice given the interface of your system. ... generic data structure ... which means that it can be used with ... Then say that the entire mechanism is implemented using the \NvmHashMap class or something like that. }
     
-    Considering the concurrency support, several assumptions have been made. Since the hashmap is to be used in a parallel mode, it must allow multiple threads to perform operations at the same time. In addition, certain design features are imposed by non-volatile memory support. Due to the constant nature of the data covered in section XXX, care has to be taken that actions performed always left map in a consistent state. All write operations need to be carried out in transactions.
+    The data structure which suits the project requirements is a generic hashmap. 
+    It is an associative array containing pairs of keys and values.
+    The keys are unique for each item and allow its unambiguous identification. 
+    The elements position in the structure is defined by a hash value of the element key. 
+    The structure genericity grants the ability to store any type of keys and values, yet requires a generic hashing function.
+    
+    The described mechanism is implemented using the \NvmHashMap class. 
+    It has to be implemented from the ground up since the \libpmemobj library does not support polymorphic types. 
+    Therefore, the interface is created similarly to the \HashMap in Java, providing basic operations such as: \insertMethod, \getMethod or \removeMethod and an \Iterator object. 
+    % \tk{Why haven't you decided to use the map interface from std?}
+    % \tk{citation needed, texttt, maybe first say about HashMap in Java, then in the next paragraph say about ConcurrentHashMap}
+    % todo https://docs.oracle.com/javase/7/docs/api/java/util/HashMap.html 
+    
+    The project is designed to work in a multithreaded environment, therefore it has to be implemented in a way enabling concurrent access. 
+    Multiple threads working at the same time should not imply incorrect data or tardiness. 
+    % The solution to this problem is inspired by the \ConcurrentHashMap in Java 7 and described in the next section.
+    
+    % \tk{NVM is important here, a separate paragraph is needed. Say briefly what are the difficulties.} 
+    In addition, certain design features are imposed by the non-volatile memory support. 
+    Due to the constant nature of the data covered in previous chapter, the system requires crash consistency support.
+    Scenarios such as power failures or application crashes need to be considered. 
+    
     
 \section{Overview}
-    As mentioned earlier, the hashmap implementation is based on the ConcurrentHashMap from seventh version of Java. The main similarities refer to the structure. In Java the hashmap class consists of sixteen smaller hashmaps with individual locks on each of them. This allows to separate different segments for the threads to work on. Furthermore, following the documentation the hash table is "supporting full concurrency of retrievals and adjustable expected concurrency for updates". The hashmap presented in this thesis follows this approach. 
+
+    The listing below presents the \NvmHashMap interface described in the previous section. \texttt{K} represents the generic type of key and \texttt{V} the generic type of value. The \texttt{arrayIndex} stands for the array that is expanding.
     
-    % quote https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ConcurrentHashMap.html 
+\begin{lstlisting}[caption={\NvmHashMap interface}]
+class NvmHashMap {
+    friend class Iterator<K,V>
     
-%   * jakich zmian wymaga uzycie NVMu
-%   * może być jakiś pseudokod jeśli jest potrzebny i pozwala coś dobrze wyjaśnić
-%   * ...
+    unsigned long long int hash(K key);
+    V insert (K key, V value);
+    V get (K key);
+    V remove (K key);
+    void expand (int arrayIndex);
+}
+\end{lstlisting}
+
+    In order to solve the concurrency issue, the hashmap implementation is based on the \ConcurrentHashMap from the seventh version of Java. %todo: break line
+    The main similarities refer to the structure.
+    In Java the mentioned class consists of sixteen smaller hashtables with individual locks on each of them.
+    This allows to separate different segments for the threads to work on.
+    The \NvmHashMap is constructed in a similar way, having a specified number of hashmaps with separate locks per each.
+    Furthermore, the \ConcurrentHashMap is \textit{supporting full concurrency of retrievals and adjustable expected concurrency for updates}. 
+    The hashmap presented in this thesis follows this approach with the writers-readers lock.
+    % https://docs.oracle.com/javase/7/docs/api/java/util/concurrent/ConcurrentHashMap.html
+    
+    Considering the NVM support, all write operations need to be carried out in transactions.
+
+    % \tk{Start by precisely stating what interface does \NvmHashMap export. Use listings (package listings). Then say what is the general architecture of the data structure and, briefly, why it is suitable for concurrent use.} 
+    
+%   todo: jakich zmian wymaga uzycie NVMu
 
 \section{Implementation}
 
     \subsubsection{Generic hashmaps} %  o problematyce generycznych hashmap i wybranej funkcji hashującej
-        The hashmap covered in this section is generic which means both the keys and values type can be set to any. As the operations are performed on generic keys, the hashing function has to support that. The chosen solution is a hash function from the std namespace. The result obtained is then casted to an unsigned long long integer. At the end the function returns an absolute value of the hashed key.
+        % \tk{What is a generic data structure has been (or will be) explained earlier, then just say that to be able to use generic type you need a hashing function. 
+        % It is easy for basic types (the \std namespace), but what about client-defined types? Show example how to use it then.}
+        
+        Since the \NvmHashMap is generic, it requires the hashing function to support the keys of arbitrary types.
+        The chosen solution is a hash method from the \std namespace. 
+        Its result is then cast to an \texttt{unsigned long long} integer.
+        At the end the function returns an absolute value of the hashed key.
+        
+        Using the basic types from the \std namespace in the \NvmHashMap is quite effortless.
+        However, it requires additional work when it comes to client-defined key types.
+        The user needs to overload the comparison operator which is used for operations such as \insertMethod, \getMethod or \removeMethod.
+        He must also provide a hash functor and one of solutions is to create a template inside the \std. 
+        As an example one may consider the implementation presented below.
+            
+\begin{lstlisting}[caption={User-defined key usage in the \NvmHashMap}]
+struct newStructure {
+    int firstAttribute;
+    std::string secondAttribute;
+    
+    bool operator==(const newStruct &element) const {
+        return (firstAttribute == other.firstAttribute 
+            && secondAttribute == other.secondAttribute);
+    }
+};
+
+namespace std {
+    template <>
+    struct hash<newStructure>
+    {
+        std::size_t operator()(const newStructure &element) const
+        {
+            using std::hash;
+            using std::string;
+
+            return ((std::hash<string>()(element.firstAttribute) << 5)
+                ^ (std::hash<int>()(element.secondAttribute) << 1);
+        }
+    };
+}
+\end{lstlisting}
 
     \subsubsection{Structure} % wewnętrzne struktury
-        The main class - the NvmHashMap - consists of three members. The first one is an integer called the internal maps count. It depends on the number of threads, is stated by user and rounded down to the next power of two. If not specified, it is set to 8 by default. The second member is a persistent pointer to a dynamic array named the Array of Segments. The use of an array allows to isolate the work of all threads from each other or at least split it in an even way between them. The Array of Segments size is equal to the internal maps count value. The third and last member of the NvmHashMap is a persistent pointer to the Array of Mutex - a dynamic array covered in the next subsection.
+        % \tk{This subsection should be rewritten and clearly state what's going on inside \NvmHashMap. Maybe use itemization, listings, etc. Start from the basic thing: you need those smaller hashmaps, which you call ... The number of the smaller hashmaps depends on ..., you keep the number of those separately in .... To support inter-thread synchronization you maintain one more array ..., which you discuss later. Now you focus on the smaller hashtable. Say somehting about NVM: the lists are supported out of the box by the NVM library. Use class field names to refer to them, e.g., \texttt{mutexArray}. } 
+
+        As mentioned before, the \NvmHashMap consists of an array of smaller hashtables which are called the \ArrayOfSegments. 
+        The use of an array allows to isolate the work of all threads from each other or at least split it in an even way between them. 
+        The number of the smaller hashmaps is kept separately in a parameter named the \internalMapsCount. 
+        It depends on the number of threads, is stated by user and rounded down to the next power of two.
+        If not specified, it is set to 8 by default. 
+        To support inter-thread synchronisation, one more array is maintained, which is called the \ArrayOfMutex and will be discussed later.
         
-        Each cell of the Array of Segments is composed of many lists which are called Segments. The actual members of the Array of Segments class are: inner array size, elements count (measuring how many elements there are in all lists in a current internal map) and a persistent pointer to the first element of the list. At the beginning there are 16 arrays in each cell of the Array of Segments. When adding items the expanding function (covered in one of the next sections) is executed and as a result the number of the arrays increases. The elements count is set to 0 at the beginning. It is used for measuring whether it is a proper time to execute an expand.
+\begin{lstlisting}[caption={\ArrayOfSegments interface}]
+class ArrayOfSegments {
+    pmem::obj::persistent_ptr<Segment<K, V>[]> segments;
+    pmem::obj::p<int> arraySize;
+    pmem::obj::p<int> elementsCount;
+}
+\end{lstlisting}
+
+        The \ArrayOfSegments interface is presented above. 
+        The class contains an array of lists which are called \Segments. 
+        The \texttt{arraySize} stands for the lists number. It is set to 16 initially and may be increased as the data is inserted into the \NvmHashMap. The last member of the class is named the \texttt{elementsCount}. It is set to 0 at first and measures how many elements are in all the \Segments in the \ArrayOfSegments. The value is used for measuring whether it is a proper time to execute an \expandMethod.
         
-        The class called Segment consists of a hash value which is an integer, size and a persistent pointer to the head of the list. Each element of the list is composed of key, value and a persistent pointer to the next element.
+\begin{lstlisting}[caption={\ArrayOfSegments interface}]
+class Segment {
+    pmem::obj::p<int> hash;
+    pmem::obj::p<int> size = 0;
+    pmem::obj::persistent_ptr <SegmentObject<K, V>> head = nullptr;
+}
+\end{lstlisting}
+
+        The \Segment class consists of a hash value, list size and a persistent pointer to the head of the list.  
+        Each \texttt{SegmentObject} of the list is composed of key, value and a persistent pointer to the next element.
         
     \subsubsection{Concurrency} % o współbieżności, readers-writer mutexes, domyślny stopień współbieżności
-        The integrity of the data during concurrent access is an important issue resolved by the Array Of Mutex. It is a table corresponding to the Array of Segments, having the same size and each lock responsible for another cell in the Array of Segments. That way if a thread is performing an operation, only a hash map to which the item belongs is locked instead of the NvmHashmap. This allows the threads working on different segments to perform concurrently.
+        The data integrity during concurrent access is maintained through the \ArrayOfMutex. 
+        It is a array corresponding to the \ArrayOfSegments, having the same size and each lock responsible for another cell in the \ArrayOfSegments. 
+        That way if a thread is performing an operation, only the \ArrayOfSegments to which the item belongs is locked instead of the entire \NvmHashMap. 
+        This allows the threads working on different sections to perform concurrently. 
         
-        Operations that require exclusive access to the Array of Segments are insert, remove and expand. They use unique locks from the std name space. While a thread is performing a write operation, the rest have no access to the hash map, neither to write or read an element. On the contrary, the "get" or "iterate" functionality do not require an absolute access to the map but a concurrent one. Therefore the only used mutex is an std shared mutex which allows the others to read data. This solution is the so called "readers-writers lock". 
+        % \tk{Now its a good moment to say that you don't necessarily need an exclusive lock for each access and a readers-writer lock sufficess (and indeed one can expect it performs much better).}
         
-    \subsubsection{Automatic hashmap extension}
-        One of the assumptions made for the discussed structure was an automatic extension of the Array of Segments. The expanding function is performed while inserting an element on a certain condition. In order for an internal map to resize, one of its segments has to contain over 70\% of the elements. That requirement is checked only for the segment to which an element is being added. Once that condition is met, the program allocates memory for the new array of segments with 4 times bigger size. Then it iterates through the old map in order to insert all previously added elements to the new one. It uses for this purpose the exactly same function as in inserting. This way all items have a newly calculated hash after resizing and therefore are evenly distributed in the array. As mentioned in the previous subsection, expanding takes place after locking a mutex for insertion, as it is a writing operation and needs exclusive access.
+        Operations that require exclusive access to the \ArrayOfSegments are \insertMethod, \removeMethod and \expandMethod.
+        They use unique locks from the \std name space. 
+        While a thread is performing one of those write operations, the rest have no access to the hash map, neither to write or read an element. 
+        On the contrary, the \getMethod or \iterateMethod methods do not require an absolute access to the map but a concurrent one. 
+        Therefore the only used mutex is an \std shared mutex which allows the others to read data at the same time. 
+        This solution is the so called \textit{readers-writers lock}. 
+        
+    \subsubsection{Automatic hashmap expansion}
+        One of the assumptions made for the discussed structure was an automatic extension of the \ArrayOfSegments. 
+        The \expandMethod method is performed while inserting an element on a certain condition. 
+        In order for an internal map to resize, one of its segments has to contain over 70\% of the elements. 
+        That requirement is checked only for the \Segment to which an element is being added. 
+        Once that condition is met, the program allocates memory for the new \ArrayOfSegments with 4 times bigger size. 
+        Then it iterates through the old map in order to insert all previously added elements to the new one. 
+        It uses for this purpose the exactly same function as in inserting. 
+        This way all items have a newly calculated hash after resizing and therefore are evenly distributed in the array. 
+        As mentioned in the previous subsection, expansion requires an exclusive access to the internal map. Therefore it takes place  after locking a mutex for insertion.
 
-    \subsubsection{Implementation of hashmap methods}
-        As previously stated, the hashmap supports insert, get and remove operations, as well as an Iterator class which allows for iterating over the whole NvmHashMap. Any kind of item operation requires two indexes to be calculated. The first one indicates an internal map (the Array of Segments) corresponding to the current thread. It is computed by hashing the key of the element and executing a logical and on both the hash and the number of the internal maps count decreased by 1. The second index marks the right segment in the Array of Segments. To calculate it, the key is hashed again, in order to then be shifted right by a logarithm of the internal maps count places bitwise. At the end it has to be divided modulo by the current map size.
+    \subsubsection{Implementation of the hashmap methods}
+        As previously stated, the hashmap supports \insertMethod, \getMethod and \removeMethod operations, as well as an \Iterator class which allows for iterating over the whole \NvmHashMap.
+        Any kind of item operation requires two indexes to be calculated. 
+        The first one indicates an internal map (the \ArrayOfSegments) corresponding to the current thread and the second one marks the right \Segment in the \ArrayOfSegments. 
+        They are both calculated by hashing the key and performing some bit operations.
     
-        While inserting an element, the first thing to do is to calculate the first index. Once the map on which work should be performed is known, the program locks a corresponding to this Array of Segments mutex. Before inserting it is checked whether the expanding function should be executed. If not, it is proceeded straight to inserting the item into the internal map. The next thing is to compute the second index and assign the hash value to the current list in case it is the first element. Then the program starts iterate through the list. If it finds an existing element with the same key, it updates it with a current value. If the list is empty, it puts the item in the first place, and if it is not - it appends it to the end. Once the addition was successful, it increments the elements count by one. The important thing is to carry out all these operations in a transaction. This way if there is some failure while adding an element, the size will not be increased. By doing this the consistency of the hashmap is provided.
+        % \tk{Difficult to follow, this paragraph needs to be revised.}
+\begin{lstlisting}[caption={\insertMethod method}]
+V insert (K key, V value) {
+    int index = calculateIndex();
+    lock(ArrayOfMutex[index];
+    if (ArrayOfSegments[index].elementsCount > 
+            0.7 * ArrayOfSegments[index].arraySize) {
+        expand(index);
+    }
+    int result = insertIntoInternalArray(key, value, arrayOfSegments[index]);
+    ArrayOfSegments[index].elementsCount += result;
+}
+    
+int insertIntoInternalArray(K key, V value, ArrayOfSegments<K, V> &aos) {
+    int index2 = calculateIndex2();
+    persistent_ptr element = aos.segments[index2].head;
+    while (element->next) {
+        if (element.key == key) {
+            updateElement(V value);
+            return 1;
+        } 
+        element = element -> next;
+    }
+    appendToTheEnd(V value);
+    return 1;
+}
+\end{lstlisting}
+
+        The basic concept for the \insertMethod method is presented in the listing XXX above. 
+        The first thing to do is to calculate the first index to determine the \ArrayOfSegments to work on.  
+        Once the map on which work should be performed is known, the program locks a corresponding to this internal map mutex. 
+        Before inserting it is checked whether the expanding function should be executed. 
+        If not, it is proceeded straight to inserting the item into the internal array. 
+        The next thing is to compute the second index and to iterate through the list. 
+        If it finds an element with the same key on the list, it updates it with a current value, otherwise appends it to the end.
+        Once the addition was successful, it increments the \texttt{elementsCount} by one. 
+        The important thing is to carry out all these operations in a transaction. 
+        This way if there is some failure while adding an element, the size will not be increased. 
+        By doing this the consistency of the hashmap is provided.
         
-        To get an item, at first the two indexes are computed. Once they are both known, a mutex matching to the current Array of Segments is locked in the shared mode. Then the function begins to iterate over the list. Once the item is found, it simply returns its value.
-        % to-do: what if the element is not found?
-    
-        Removing function is quite similar to the get one. In the beginning, the two indexes are calculated. Then, again a mutex is locked but in this case it is a unique lock. The programs starts to iterate over the segment and when the item is found, it opens a transaction. It deletes the element from the list and decreases its size by 1.
-        % to-do: what if the element is not found?
+\begin{lstlisting}[caption={\getMethod method}]
+V get (K key) {
+    int index = calculateIndex();
+    int index2 = calculateIndex2();
+    lock(ArrayOfMutex[index];
+    persistent_ptr element = ArrayOfSegments[index].segments[index2].head;
+    while (element->next) {
+        if (element.key == key) {
+            return element;
+        }
+        element = element -> next;
+    } 
+    throw "Did not found"
+}
+\end{lstlisting}
+        To get an item, at first the two indexes are computed. 
+        Once they are both known, a mutex matching to the current \ArrayOfSegments is locked in the shared mode. 
+        Then the function begins to iterate over the list. 
+        Once the item is found, it simply returns its value, otherwise an exception is thrown.
+        
+                
+\begin{lstlisting}[caption={\removeMethod method}]
+V remove (K key) {
+    int index = calculateIndex();
+    int index2 = calculateIndex2();
+    lock(ArrayOfMutex[index];
+    persistent_ptr element = ArrayOfSegments[]index].segments[index2].head;
+    while (element->next) {
+        if (element.key == key) {
+            removeElement();
+            arrayOfSegments[index].segments[index2].size -= 1;
+            arrayOfSegments[index].elementsCount -= 1;
+            return value;
+        }
+        element = element -> next;
+    } 
+    throw "Did not found"
+}
+\end{lstlisting}
+        % \tk{Avoid continues form, say simply the \texttt{remove} function ... } 
+        The \removeMethod function introduced above is quite similar to the \get one. 
+        In the beginning, the two indexes are calculated. 
+        Then, again a mutex is locked but in this case it is a \tk{unique?} unique lock from the \std namespace.
+        The programs starts to iterate over the segment and when the item is found, it opens a transaction. 
+        It deletes the element from the list and decreases corresponding sizes by 1.
+        If the element is not found, the program throws an exception.
             
-        The Iterator class provides a function that starts iterating through the hashmap from the first cell of Array of Segments. At first it locks the corresponding mutex as a shared lock. Then it begins to iterate over the first segment. While accessing every object it locks the shared mutex again. When it finishes iterating over the list, it moves to the next segment and locks the mutex once more. Once all segments are iterated over, the function repeats the same steps for the next Array of Segments until there are no left to loop over. Since iterating uses only a shared lock, it may provide slightly inconsistent image of the hashmap while working in a multithreaded mode. If one thread starts iterating and another one will remove an item in the meantime, the first one may still see it in a hashmap. The same way, if one adds an element, it may not be visible for the second one yet. This inconsistency could have been solved by using an exclusive mode of locking, however, it would lead to lower availability of data. Therefore, this kind of trade-off between the availability of data and consistency has been made.
+            
+% \begin{lstlisting}[caption={\iterateMethod method}]
+% bool next () {
+%     if (element->next) {
+%         element = element -> next;
+%         return true;
+%     }
+    
+
+%     for (index in 0 .. internalMapsCount) {
+%         lock(ArrayOfMutex[index];
+%         for (index2 in 0 .. ArrayOfSegments[index].arraySize) {
+%             persistent_ptr element = ArrayOfSegments[]index].segments[index2].head;
+%             while (element->next) {
+%                 return true;
+%             }
+%             element = element -> next;
+%         }
+%     }
+% }
+% \end{lstlisting}
+
+        The \NvmHashMap implements also an \Iterator which can be used to easily iterate through the hashmap.
+        After initialization, it locks the first cell of the \ArrayOfSegments and sets pointer to the head of the list.
+        It provides a boolean method called \texttt{next} which moves the pointer to the next object of the list until its end. 
+        While accessing every element the method locks the corresponding shared mutex again. 
+        When it finishes iterating over the list, it moves to the next \Segment and locks the mutex once more. 
+        Once all the segments are iterated over, the function repeats the same steps for the next \ArrayOfSegments until there are no left to loop over.
+        
+        % \tk{New paragraph. Maybe start with something like that: note that ensuring correct iteration over a concurrent data structure such as \NvmHashMap is not easy, as it always involves a tradeoff ... and discuss it. Then say what you decided. } 
+        It is worth noting that ensuring a correct iteration over a concurrent data structure such as \NvmHashMap is not easy. 
+        Since the \iterateMethod method uses only a shared lock, it may provide slightly inconsistent image of the hashmap while working in a multithreaded mode.
+        If one thread starts iterating and another one will remove an item in the meantime, the first one may still see it in a hashmap. 
+        The same way, if one adds an element, it may not be visible for the second one yet. 
+        This inconsistency could have been solved using an exclusive mode of locking, however, it would reduce the availability of data. 
+        Since it is extremely difficult to achieve both consistency and high availability at the same time, it has been agreed to focus on the data accessibility.
 
 \section{Evaluation}
 
     \subsubsection{Correctness tests}
-        To ensure that the hashtable works correctly, a range of unit tests was developed. As previously stated, the GoogleTest library was used. Logic tests try to verify the correctness of implemented operations: insert, get, remove and iterate. They are run on two instances of hashtable: integer and string type. 
+        In order to ensure that the hashtable works correctly, a range of unit tests was developed. 
+        To this end we relied on the \GoogleTest library.
+        % \tk{Logic tests don't sound right.} 
+        Unit tests try to verify the correctness of the implemented operations: \insertMethod, \getMethod, \removeMethod and \iterateMethod. 
+        They are performed on two different instances of the hashtable: $<$int, int$>$ and $<$string, string$>$ 
+        %\tk{Do you mean $<$int,int$>$ and $<$string, string$>$ If so, say precisely what you mean}. 
     
-        The first test works in single-threaded mode and inserts a number of elements with a known sum. Then it iterates through the hashmap, at the same time summing elements. At the end with an assert it checks for the equality of those two sums. 
+        The first test works in single-threaded mode and inserts a number of elements with a known sum.
+        Then it iterates through the hashmap, at the same time summing elements. 
+        At the end with an assert it checks for the equality of those two sums.\tk{What are the assertions for the string-based hashmap?}
         
-        Next tests concentrate on insert, get and remove functions. It has been decided to verify them both in single- such as multithreaded mode (using 8 threads), where one thread inserts 100000 elements. After completing the addition, one test case tries to get previously added values, while the second one tries to remove them. In order for the test to pass, all inserted items need to be either found or deleted. Considering the fact that both get and remove function returns a value of an element identified by a key, for each case the received value is compared with the added one using an assert.
+        Next tests concentrate on insert, get and remove functions. 
+        We verify them both in the single and multithreaded mode (using 8 threads). Each thread inserts 100000 elements. 
+        After completing the addition, one test case tries to get previously added values, while the second one tries to remove them. 
+        In order for the test to pass, all inserted items need to be either found or deleted. 
+        Considering the fact that both get and remove methods return a value of an element identified by a key, for each case the received value is compared with the added one using an assert.
         
-        One of problems encountered while developing unit tests was the non-volatile nature of the data. After one finished test the program was still keeping previously added values in the memory. If the inserting functionality was the main purpose of the next test case, it could not have been clear whether the program worked properly or it referred to previous values. Since the tests job was to detect if the code works correctly, implemented functions could not been relied to delete all values before next test. The chosen solution was to run each each test in a separate test case. That way the files could have been deleted and the memory cleared in between tests.
+        \tk{It's not a problem, this is to be expected. So this has to be rewritten. You can say that there is something that one needs to remember when performing this kinds of tests, or something along those lines.} 
+        One of problems encountered while developing unit tests was the non-volatile nature of the data. 
+        After one finished test the program was still keeping previously added values in the memory. 
+        If the inserting functionality was the main purpose of the next test case, it could not have been clear whether the program worked properly or it referred to previous values. 
+        Since the tests job was to detect if the code works correctly, implemented functions could not been relied to delete all values before next test. 
+        The chosen solution was to run each each test in a separate test case. 
+        That way the files could have been deleted and the memory cleared in between tests.
 
 %   * correctness tests
 %      - single-threaded
@@ -66,37 +329,41 @@ In this chapter we will discuss the key component of our system which allows us 
 %      - ...
 
     \subsubsection{Performance tests}
-        The performance tests concentrated on comparing the effectiveness of NVM-enabled hashtable with the \textit{unordered\_map} from the std namespace. They measured time for 8 threads to insert, get and remove 100000 elements. Then they conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread. 
-    
+        The performance tests concentrated on comparing the effectiveness of NVM-enabled hashtable with the \textit{unordered\_map} from the std namespace \tk{what are the characteristics of the unordered\_map?}. 
+        They measured time for 8 threads to insert, get and remove 100000 elements. 
+        Then they conducted the same calculations for respectively 16, 8, 4, 2 and 1 thread.\tk{Why the reverse order? A table is OK, but a plot would be much better -- it is easier to see whether the implementation scales at all and how good is scalability. You should add a commentary. You should state what computer environment you used to conduct those tests.}
+        
         \begin{table}[h]
-        \caption{Time measurements for basic operations such as insert, get and delete, comparing the NVM-enabled hashtable with unordered map}\label{tab:tabela}
-        \centering\footnotesize%
-            \begin{tabular}{|c|c|c|c|} 
+            \caption{Time measurements for basic operations such as insert, get and delete, comparing the NVM-enabled hashtable with unordered map \tk{Maybe use hline (see below).}}\label{tab:tabela}
+            \centering\footnotesize%
+             \begin{tabular}{|c|c|c|c|}
                 \toprule
-                Number of threads & Operation & NVM-enabled hashmap - time [s] & Unordered map - time [s] \\
+                Number of threads & Operation & NVM-enabled hashmap - time {[}s{]} & Unordered map - time {[}s{]} \\
+                \hline
+                16                & insert    & 4.84215                            & 0.99416                      \\
+                16                & get       & 0.305345                           & 0.0920371                    \\
+                16                & delete    & 2.66602                            & 0.486955                     \\
                 \midrule
-                16 & insert & 0.418 & \\
-                16 & get & 0.031 &    \\
-                16 & delete & 0.25 &  \\
+                8                 & insert    & 2.43674                            & 0.312931                     \\
+                8                 & get       & 0.143133                           & 0.0479573                    \\
+                8                 & delete    & 1.43604                            & 0.20109                      \\
                 \midrule
-                8 & insert & 0.183 &  \\
-                8 & get & 0.013 &     \\
-                8 & delete & 0.114 &  \\
+                4                 & insert    & 1.15494                            & 0.155025                     \\
+                4                 & get       & 0.0734925                          & 0.0221171                    \\
+                4                 & delete    & 0.6994                             & 0.0958875                    \\
                 \midrule
-                4 & insert & 0.109 &  \\
-                4 & get & 0.006 &     \\
-                4 & delete & 0.052 &  \\
+                2                 & insert    & 0.656984                           & 0.0781585                    \\
+                2                 & get       & 0.0352688                          & 0.0154281                    \\
+                2                 & delete    & 0.446401                           & 0.0497833                    \\
                 \midrule
-                2 & insert & 0.057 &  \\
-                2 & get & 0.003 &     \\
-                2 & delete & 0.037 &  \\
-                \midrule
-                1 & insert & 0.048 &  \\
-                1 & get & 0.003 &     \\
-                1 & delete & 0.033 &  \\
+                1                 & insert    & 0.596919                           & 0.039291                     \\
+                1                 & get       & 0.0306931                          & 0.0142082                    \\
+                1                 & delete    & 0.428009                           & 0.0252251                    \\
                 \bottomrule
             \end{tabular}
         \end{table}
+        
+        %TODO: zaokraglic
 
 %   * performance tests
 %      - stress tests under some workload, measuring scaling wrt the number threads used
