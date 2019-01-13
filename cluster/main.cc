@@ -4,6 +4,8 @@
 #include <seastar/core/distributed.hh>
 #include <vector>
 #include <iostream>
+#include <boost/algorithm/string.hpp>
+#include <chrono>
 
 using namespace seastar;
 static std::string str_ping{"ping"};
@@ -20,6 +22,27 @@ struct claster_node {
     server_socket socket;
     ipv4_addr address;
 };
+
+uint16_t port;
+std::string my_addr;
+std::vector<std::string> addresses;
+
+std::string serialize(std::vector<std::string> vec, char split = '_') {
+    std::string result = "";
+    for (int i = 0; i < vec.size(); i++) {
+        result.append(vec[i]+split);
+    }
+    return result;
+}
+
+std::vector<std::string> deserialize(std::string msg, char split = '_') {
+    std::vector<std::string> vec;
+    boost::split(vec, msg, [split](char c){return c == split;});
+    return vec;
+}
+long timestamp() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
 
 class tcp_server {
     std::vector<server_socket> _tcp_listeners;
@@ -52,8 +75,9 @@ public:
         socket_address local = socket_address(::sockaddr_in{AF_INET, INADDR_ANY, {0}});
         engine().net().connect(make_ipv4_address(server_addr), local, transport::TCP).then([this] (connected_socket fd) {
             auto conn = new connection(std::move(fd));
-            conn->write("connect").then_wrapped([conn] (auto&& f) {
-                conn->read_once().then_wrapped([conn] (auto&& f) {
+            std::string msg = "connect_" + std::to_string(timestamp()) + '_' + my_addr + "_" +std::to_string(port);
+            conn->write(msg).then_wrapped([conn] (auto&& f) {
+                conn->read().then_wrapped([conn] (auto&& f) {
                     delete conn;
                     std::cout<<"conn closed"<<std::endl;
                     try {
@@ -119,14 +143,42 @@ public:
                 }
                 auto cmd = std::string(buf.get(), buf.size());
                 std::cout<<cmd << std::endl;
-                if (cmd == "connect") {
-                    std::cout << "New node" << std::endl;
+
+                std::vector<std::string> result = deserialize(cmd);
+
+                std::cout<< result[0] << std::endl;
+
+                if (result[0] == "connect") {                    
+                    std::string tmp_addr = result[1] + ":" +result[2];
+                    addresses.push_back(tmp_addr);
+
+                    std::cout << "New node: " << result[2] << ':' <<result[3] << std::endl;
+
+                    std::string curr_nodes = "nodes_" + std::to_string(timestamp()) + '_' serialize(addresses);
+
+                    std::cout << "Send: " << curr_nodes << std::endl;
+
+                    return _write_buf.write(curr_nodes).then([this] {
+                        return _write_buf.flush();
+                    }).then([this] {
+                        return this->read();
+                    });
                 }
-                return _write_buf.write(cmd).then([this] {
-                    return _write_buf.flush();
-                }).then([this] {
-                    return this->read();
-                });
+                
+                if (result[0] == "nodes") {                    
+                    std::cout << "Get nodes: " << cmd << std::endl;
+                    addresses = result;
+                    addresses.erase(addresses.begin());
+                    std::cout << addresses[0] << std::endl;;
+
+                }
+
+                // return _write_buf.write(cmd).then([this] {
+                //     return _write_buf.flush();
+                // }).then([this] {
+                //     return this->read();
+                // });
+                return this->read();
             });
         }
 
@@ -167,17 +219,20 @@ int main(int ac, char** av) {
     app.add_options()
         ("port", bpo::value<uint16_t>()->default_value(10000), "TCP server port")
         ("tcp", bpo::value<std::string>()->default_value("yes"), "tcp listen")
+        ("my_addr", bpo::value<std::string>()->required(), "My address")
         ("addr", bpo::value<std::string>()->default_value(""), "Server address");
     return app.run_deprecated(ac, av, [&] {
-        std::cout<<"AAAA"<<std::endl;
         auto&& config = app.configuration();
-        uint16_t port = config["port"].as<uint16_t>();
+        port = config["port"].as<uint16_t>();
         enable_tcp = config["tcp"].as<std::string>() == "yes";
         auto addr = config["addr"].as<std::string>();
+        my_addr = config["my_addr"].as<std::string>();
         if (!enable_tcp) {
             fprint(std::cerr, "Error: no protocols enabled. Use \"--tcp yes\" to enable\n");
             return engine().exit(1);
         }
+
+        addresses.push_back(my_addr + ':' + std::to_string(port));
 
         auto server = new distributed<tcp_server>;
         server->start().then([server = std::move(server), port, addr] () mutable {
