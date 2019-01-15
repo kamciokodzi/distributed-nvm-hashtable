@@ -187,3 +187,9 @@ RUN ./install-dependencies.sh
 RUN ./configure.py
 RUN ninja -C build/release
 RUN dnf install -y nc
+
+# NVMHashMap tests
+RUN dnf install -y gtest-devel
+RUN cd /distributed-nvm-hashtable/map/tests
+WORKDIR /distributed-nvm-hashtable/map/tests
+RUN cmake CMakeLists.txt
