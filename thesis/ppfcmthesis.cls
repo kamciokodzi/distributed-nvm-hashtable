@@ -1,6 +1,6 @@
 %
 % This is a LaTeX class for master and bachelor theses following the guidelines
-% of Faculty of Computer Science and Management at Poznan University of Technology.
+% of Faculty of Computer Science at Poznan University of Technology.
 %
 % This class is UNOFFICIAL and NOT ENDORSED by the university.
 %
@@ -35,13 +35,7 @@
 \newif\if@pppolish
 \iflanguage{polish}{\@pppolishtrue}{\@pppolishfalse}
 
-\if@pppolish
-\selectlanguage{polish}
-\RequirePackage{indentfirst}
-\addto\captionspolish{\renewcommand{\bibname}{Literatura}}   % Force "Literatura" instead of "Bibliografia"
-\else
 \selectlanguage{english}
-\fi
 
 \RequirePackage{setspace}
 \RequirePackage{booktabs}
@@ -80,7 +74,6 @@
     anchorcolor=black,
     filecolor=black,
     menucolor=black,
-    pagecolor=black,
     urlcolor=black,
     pdftitle={},
     pdfauthor={},
@@ -100,11 +93,8 @@
 
 \renewcommand{\maketitlehooka}{%
 \begin{center}
-\if@pppolish
-Politechnika Pozna\'nska\\Wydzia{\l} Informatyki i Zarz{\k{a}}dzania\\Instytut Informatyki
-\else
-Poznan University of Technology\\Faculty of Computer Science and Management\\Institute of Computer Science
-\fi\end{center}}
+Poznan University of Technology\\Faculty of Computer Science\\Institute of Computer Science
+\end{center}}
 
 \pretitle{\vspace{2cm}\begin{center}%
 \if@pppolish%
@@ -120,11 +110,8 @@ Poznan University of Technology\\Faculty of Computer Science and Management\\Ins
 \renewcommand{\maketitlehookb}{\vspace{1cm}}
 
 \renewcommand{\maketitlehookc}{\vfill\begin{center}
-\if@pppolish
-Promotorzy\\\@ppsupervisor
-\else
 Supervisors\\\@ppsupervisor
-\fi\end{center}
+\end{center}
 \vspace{2cm}\begin{center}Pozna\'n, \@ppyear\if@pppolish~r.\fi\end{center}
 }
 
@@ -142,31 +129,26 @@ Supervisors\\\@ppsupervisor
 \vglue 0pt\copyright{} \@ppyear\ \@author
 
 \medskip\noindent%
-\if@pppolish%
-Instytut Informatyki, Wydzia{\l} Informatyki i Zarz{\k{a}}dzania\\%
-Politechnika Pozna\'nska%
-\else%
-Poznan University of Technology\\Faculty of Computer Science and Management\\Institute of Computer Science
-\fi
+Poznan University of Technology\\Faculty of Computer Science\\Institute of Computer Science
 
 \medskip\noindent%
-\if@pppolish%
-Sk{\l}ad przy u{\.z}yciu systemu \LaTeX{}.
-\else%
-Typeset using \LaTeX\ in Computer Modern.
-\fi
+% \if@pppolish%
+% Sk{\l}ad przy u{\.z}yciu systemu \LaTeX{}.
+% \else%
+% Typeset using \LaTeX\ in Computer Modern.
+% \fi
 
 \renewcommand{\and}{\unskip{} $\backslash$and }%
-\medskip\noindent Bib\TeX{}:\\[1ex]
-\tiny\texttt{%
-@mastersthesis\{ key,\\
-\hspace*{2em}author = "\@author",\\
-\hspace*{2em}title = "\{\@title\}",\\
-\hspace*{2em}school = "Poznan University of Technology",\\
-\hspace*{2em}address = "Pozna\{$\backslash$'n\}, Poland",\\
-\hspace*{2em}year = "\@ppyear",\\
-\}
-}
+% \medskip\noindent Bib\TeX{}:\\[1ex]
+% \tiny\texttt{%
+% @mastersthesis\{ key,\\
+% \hspace*{2em}author = "\@author",\\
+% \hspace*{2em}title = "\{\@title\}",\\
+% \hspace*{2em}school = "Poznan University of Technology",\\
+% \hspace*{2em}address = "Pozna\{$\backslash$'n\}, Poland",\\
+% \hspace*{2em}year = "\@ppyear",\\
+% \}
+% }
 \end{minipage}
 }
 
@@ -216,7 +198,6 @@ Typeset using \LaTeX\ in Computer Modern.
 \setmarginnotes{6pt}{50pt}{\onelineskip}
 \setheadfoot{\onelineskip}{2\onelineskip}
 \setheaderspaces{*}{2\onelineskip}{*}
-\onehalfspacing
 
 \changecaptionwidth
 \captionwidth{.9\linewidth}
@@ -240,19 +221,3 @@ Typeset using \LaTeX\ in Computer Modern.
 \def\thesubsubsection {\thesubsection .\arabic{subsubsection}}
 
 \checkandfixthelayout
-
-%
-% Macros 
-%
-
-% English
-\newcommand{\termdef}[1]{\emph{#1}}
-\newcommand{\acronym}[1]{\emph{\MakeUppercase{#1}}}
-
-% Polish
-\newcommand{\definicja}[1]{\termdef{#1}}
-\newcommand{\akronim}[1]{\acronym{#1}}
-\newcommand{\english}[1]{ang.~\emph{#1}}
-
-% Table head
-\newcolumntype{L}{c}\newcommand{\tabhead}[1]{\multicolumn{1}{L}{#1}}

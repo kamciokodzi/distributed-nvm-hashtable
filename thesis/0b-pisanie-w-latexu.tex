@@ -5,20 +5,6 @@ Po pierwsze to gratulacje --- dobry wybór. W tym rozdziale znajduje się
 garść informacji o tym, jak poprawnie składać tekst pracy w systemie \LaTeX{} wraz z 
 przykładami, które mają służyć do przeklejania do własnych dokumentów.
 
-\section{Narzędzia}
-Pracując pod systemem Windows, polecam:
-\begin{itemize}
-    \item MikTeX, \url{http://www.miktex.org/},
-    \item JEdit, \url{http://www.jedit.org/},
-    \item Ghostview, Ghostscript (podgląd dokumentów PDF bez blokowania pliku):\\
-        \url{http://www.cs.wisc.edu/~ghost/}. 
-\end{itemize}
-
-Po zainstalowaniu tych narzędzi wystarczy wykonać polecenie \texttt{compile.bat} (który
-jest skryptem wsadowym dla Windows). Dla tych, którzy wolą nieco automatyzacji --- skrypt
-\texttt{latexmk}, który jest w MikTeXu (a który potrzebuje zainstalowanego Perla) jest
-również bardzo wygodny: \texttt{latexmk -pdf -pvc main.tex}.
-
 \section{Edycja tekstu}
 \chaptermark{Tytuł rozdziału, jeśli pełen się nie mieści\ldots{}}{}
 
@@ -92,18 +78,6 @@ docelowo & we call this a \termdef{Database Management System} (\acronym{DBMS}) 
 \bottomrule
 \end{tabular}
 \end{center}
-
-\paragraph{Makra zdefiniowane dla języka polskiego.} Podobnie jak dla języka angielskiego zdefiniowano
-odpowiedniki polskie: \texttt{defini\-cja}, \texttt{akronim} oraz \texttt{english} dla tłumaczeń angielskich
-terminów. Przykłady poniżej obrazują ich przewidywane użycie w tekście.
-\begin{center}\footnotesize%
-\begin{tabular}{l >{\rightskip\fill}p{12cm}}
-\toprule
-źródło   & \texttt{nazywamy go $\backslash$definicja\{systemem zarządzania bazą danych\} ($\backslash$akronim\{DBMS\}, $\backslash$english\{Database Management System\})} \\ \cmidrule(lr){2-2}
-docelowo & nazywamy go \definicja{systemem zarządzania bazą danych} (\akronim{DBMS}, \english{Database Management System}) \\ \bottomrule
-\end{tabular}
-\end{center}
-
 
 \subsection{Rysunki}
 

@@ -28,7 +28,10 @@
     numbers=left, % display line numbers on the left
     commentstyle=\color{green}, % comment color
     keywordstyle=\color{blue}, % keyword color
-    stringstyle=\color{red} % string color
+    stringstyle=\color{red}, % string color
+    language=C++,
+    %basicstyle=\ttfamily\footnotesize
+    basicstyle=\ttfamily\small
 }
 
 % Front matter starts here
@@ -49,14 +52,16 @@
 \input{01-introduction.tex}
 \input{02-theory.tex}
 \input{03-own-work.tex}
-\input{04-conclusion.tex}
+\input{04-distributed.tex}
+\input{05-conclusions.tex}
 
 % All appendices and extra material, if you have any.
 \cleardoublepage\appendix%
 %\input{0a-appendix.tex}
 
 % Bibliography (books, articles) starts here.
-\bibliographystyle{alpha}{\raggedright\sloppy\small\bibliography{bibliography}}
+\bibliographystyle{abbrv}{\raggedright\sloppy\small\bibliography{bibliography}}
+
 
 % Colophon is a place where you should let others know about copyrights etc.
 \ppcolophon
