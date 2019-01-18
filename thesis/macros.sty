@@ -2,15 +2,21 @@
 
 % classes and parameters names
 \newcommand{\HashMap}{\texttt{HashMap}\xspace }
-\newcommand{\ConcurrentHashMap}{\texttt{ConcurrentHashMap}\xspace }
+\newcommand{\ConcurrentHashMap}{\texttt{Con\-current\-HashMap}\xspace }
 \newcommand{\NvmHashMap}{\texttt{NvmHashMap}\xspace }
-\newcommand{\ArrayOfSegments}{\texttt{ArrayOfSegments}\xspace }
-\newcommand{\ArrayOfMutex}{\texttt{ArrayOfMutex}\xspace }
+\newcommand{\internalHashMap}{\texttt{Internal\-Hashmap}\xspace }
+\newcommand{\internalHashMaps}{\texttt{Internal\-Hashmaps}\xspace }
+\newcommand{\locks}{\texttt{Locks}\xspace }
 \newcommand{\Segment}{\texttt{Segment}\xspace }
 \newcommand{\Segments}{\texttt{Segments}\xspace }
+\newcommand{\SegmentObject}{\texttt{Segment\-Object}\xspace }
+\newcommand{\SegmentObjects}{\texttt{Segment\-Objects}\xspace }
 \newcommand{\Iterator}{\texttt{Iterator}\xspace }
-\newcommand{\internalMapsCount}{\texttt{internalMapsCount}\xspace }
-
+\newcommand{\internalHashMapsCount}{\texttt{internalHashMapsCount}\xspace }
+\newcommand{\unorderedMap}{\texttt{unordered\_map}\xspace }
+\newcommand{\integersMap}{\texttt{$<$int, int$>$}\xspace }
+\newcommand{\stringsMap}{\texttt{$<$string, string$>$}\xspace }
+\newcommand{\DHT}{\texttt{Distributed Hash Table}\xspace }
 
 % methods
 \newcommand{\insertMethod}{\texttt{insert}\xspace }
@@ -25,5 +31,11 @@
 \newcommand{\std}{\texttt{std}\xspace }
 \newcommand{\libpmemobj}{\texttt{libpmemobj}\xspace }
 
-
 \newcommand{\tk}[1]{\textbf{[[ TK:} #1 \textbf{]]}}
+
+% English
+\newcommand{\termdef}[1]{\emph{#1}}
+\newcommand{\acronym}[1]{\emph{\MakeUppercase{#1}}}
+
+% Table head
+\newcolumntype{L}{c}\newcommand{\tabhead}[1]{\multicolumn{1}{L}{#1}}
