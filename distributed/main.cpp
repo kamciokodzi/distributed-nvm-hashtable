@@ -12,16 +12,22 @@
 #include <memory>
 #include <utility>
 #include <boost/asio.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/variables_map.hpp>
 #include "../map/NvmHashMap.hpp"
 
-struct root
-{
-    pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
-};
+// struct root
+// {
+//     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
+// };
 
-pmem::obj::persistent_ptr<root> root_ptr;
+// pmem::obj::persistent_ptr<root> root_ptr;
 
 using boost::asio::ip::tcp;
+namespace bpo = boost::program_options;
+
+bpo::options_description desc("Allowed options");
 
 class session
   : public std::enable_shared_from_this<session>
@@ -98,27 +104,33 @@ private:
 
 int main(int argc, char* argv[])
 {
-  pmem::obj::pool<root> pop;
-  pop = pmem::obj::pool<root>::create("file.txt", "", PMEMOBJ_MIN_POOL, 0777);
+  // pmem::obj::pool<root> pop;
+  // pop = pmem::obj::pool<root>::create("file.txt", "", PMEMOBJ_MIN_POOL, 0777);
 
-  root_ptr = pop.root();
+  // root_ptr = pop.root();
 
-  pmem::obj::transaction::run(pop, [&] {
-      root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);      
-  });
-  root_ptr->pmap->insertNew(1, 42);
-  std::cout << root_ptr->pmap->get(1) << std::endl;
+  // pmem::obj::transaction::run(pop, [&] {
+  //     root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);      
+  // });
+  // root_ptr->pmap->insertNew(1, 42);
+  // std::cout << root_ptr->pmap->get(1) << std::endl;
+ 
+  desc.add_options()
+    ("port", bpo::value<std::string>()->default_value("10000"), "TCP server port")
+    ("my_addr", bpo::value<std::string>()->required(), "My address")
+    ("addr", bpo::value<std::string>()->default_value(""), "Server address");
+
+  bpo::variables_map vm;
+  bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
+  bpo::notify(vm); 
+
+  std::cout<<"TCP server listen on port: "<<vm["port"].as<std::string>()<<std::endl;
+
   try
   {
-    if (argc != 2)
-    {
-      std::cerr << "Usage: async_tcp_echo_server <port>\n";
-      return 1;
-    }
-
     boost::asio::io_context io_context;
 
-    server s(io_context, std::atoi(argv[1]));
+    server s(io_context, std::atoi(vm["port"].as<std::string>().c_str()));
 
     io_context.run();
   }
