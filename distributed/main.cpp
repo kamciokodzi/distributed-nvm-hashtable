@@ -12,7 +12,7 @@
 #include <memory>
 #include <utility>
 #include <boost/asio.hpp>
-#include "map/NvmHashMap.hpp"
+#include "../map/NvmHashMap.hpp"
 
 struct root
 {
