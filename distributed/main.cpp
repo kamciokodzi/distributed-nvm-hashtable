@@ -15,6 +15,7 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
+#include <boost/algorithm/string.hpp>
 #include "../map/NvmHashMap.hpp"
 
 // struct root
@@ -28,6 +29,56 @@ using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
 
 bpo::options_description desc("Allowed options");
+bpo::variables_map vm;
+
+class session;
+
+class node {
+public:
+    session* _session;
+    std::string addr;
+    node(session* s, std::string a){
+        this->_session = s;
+        this->addr = a;
+    }
+    node(std::string a){
+        this->addr = a;
+        this->_session = nullptr;
+    }
+    node(){
+        this->_session = nullptr;
+    }
+};
+
+std::unordered_map<std::string, node> nodes_map;
+
+std::string serialize(std::vector<std::string> vec, char split = '_') {
+    std::string result = "";
+    for (int i = 0; i < vec.size()-1; i++) {
+        result.append(vec[i]+split);
+    }
+    result.append(vec[vec.size()-1]);
+    return result;
+}
+
+std::string serialize(std::unordered_map<std::string,node> map, char split = '_') {
+    std::string result = "";
+    for (const auto & [key, value] : map) {
+        result.append(key+split);
+    }
+    result = result.substr(0,result.length()-1);
+    return result;
+}
+
+std::vector<std::string> deserialize(std::string msg, char split = '_') {
+    std::vector<std::string> vec;
+    boost::split(vec, msg, [split](char c){return c == split;});
+    return vec;
+}
+
+long timestamp() {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
 
 class session
   : public std::enable_shared_from_this<session>
@@ -52,8 +103,18 @@ private:
         {
           if (!ec)
           {
+            std::cout<<data_<<std::endl;
+            std::vector<std::string> cmd = deserialize(std::string(data_));
+            std::cout<<cmd[0]<<std::endl;
+            if (cmd[0] == "connect") {
+              node n = node(this, cmd[2]);
+              nodes_map[cmd[2]] = n;
+              std::cout<<"New node: "<<cmd[2];
+            }
             do_write(length);
           }
+          memset(data_, 0, max_length);
+          do_read();
         });
   }
 
@@ -65,7 +126,7 @@ private:
         {
           if (!ec)
           {
-            do_read();
+            //do_read();
           }
         });
   }
@@ -120,7 +181,6 @@ int main(int argc, char* argv[])
     ("my_addr", bpo::value<std::string>()->required(), "My address")
     ("addr", bpo::value<std::string>()->default_value(""), "Server address");
 
-  bpo::variables_map vm;
   bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
   bpo::notify(vm); 
 
