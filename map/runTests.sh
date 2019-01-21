@@ -7,43 +7,43 @@ sudo rm -f Combined.csv
 cd ..
 make
 cd ..
-sudo rm -rf /mnt/mem/file*
+sudo rm -rf file*
 
 # run NvmHashMap<int, int> correctness tests
-sudo tests/runTestsIntIterate /mnt/mem/fileIntIterate
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsIntInsertGet /mnt/mem/fileIntInsertGet
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsIntInsertRemove /mnt/mem/fileIntInsertRemove
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsIntInsertGetParallel /mnt/mem/fileIntInsertGetParallel
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsIntInsertRemoveParallel /mnt/mem/fileIntInsertRemoveParallel
-sudo rm -rf /mnt/mem/file*
+sudo tests/runTestsIntIterate fileIntIterate
+sudo rm -rf file*
+sudo tests/runTestsIntInsertGet fileIntInsertGet
+sudo rm -rf file*
+sudo tests/runTestsIntInsertRemove fileIntInsertRemove
+sudo rm -rf file*
+sudo tests/runTestsIntInsertGetParallel fileIntInsertGetParallel
+sudo rm -rf file*
+sudo tests/runTestsIntInsertRemoveParallel fileIntInsertRemoveParallel
+sudo rm -rf file*
 
 # run NvmHashMap<string, string> correctness tests
-sudo tests/runTestsStringIterate /mnt/mem/fileStringIterate
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsStringInsertGet /mnt/mem/fileStringInsertGet
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsStringInsertRemove /mnt/mem/fileStringInsertRemove
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsStringInsertGetParallel /mnt/mem/fileStringInsertGetParallel
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsStringInsertRemoveParallel /mnt/mem/fileStringInsertRemoveParallel
-sudo rm -rf /mnt/mem/file*
+sudo tests/runTestsStringIterate fileStringIterate
+sudo rm -rf file*
+sudo tests/runTestsStringInsertGet fileStringInsertGet
+sudo rm -rf file*
+sudo tests/runTestsStringInsertRemove fileStringInsertRemove
+sudo rm -rf file*
+sudo tests/runTestsStringInsertGetParallel fileStringInsertGetParallel
+sudo rm -rf file*
+sudo tests/runTestsStringInsertRemoveParallel fileStringInsertRemoveParallel
+sudo rm -rf file*
 
 # run NvmHashMap<int, int> performance tests
-sudo tests/runTestsPerformance1 /mnt/mem/filePerformance1
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsPerformance2 /mnt/mem/filePerformance2
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsPerformance4 /mnt/mem/filePerformance4
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsPerformance8 /mnt/mem/filePerformance8
-sudo rm -rf /mnt/mem/file*
-sudo tests/runTestsPerformance16 /mnt/mem/filePerformance16
-sudo rm -rf /mnt/mem/file*
+sudo tests/runTestsPerformance1 filePerformance1
+sudo rm -rf file*
+sudo tests/runTestsPerformance2 filePerformance2
+sudo rm -rf file*
+sudo tests/runTestsPerformance4 filePerformance4
+sudo rm -rf file*
+sudo tests/runTestsPerformance8 filePerformance8
+sudo rm -rf file*
+sudo tests/runTestsPerformance16 filePerformance16
+sudo rm -rf file*
 
 # run unordered_map performance tests
 sudo tests/runTestsPerformanceUnordered
