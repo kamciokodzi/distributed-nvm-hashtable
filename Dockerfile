@@ -16,6 +16,7 @@ RUN dnf update -y \
 	fuse \
 	fuse-devel \
 	gcc \
+	gcc-c++ \
 	gdb \
 	git \
 	glib2-devel \
@@ -77,6 +78,10 @@ RUN dnf update -y \
 	bash-completion \
 	ndctl-devel \
 	daxctl-devel \
+	vim \
+	clang \
+	libaio-devel \
+	boost-devel \ 
  && dnf clean all
 
 # Add user
@@ -122,71 +127,9 @@ RUN ldconfig
 RUN git clone https://github.com/kamciokodzi/distributed-nvm-hashtable
 WORKDIR /distributed-nvm-hashtable/map
 RUN g++ main.cpp -o main -std=c++17 -lpmem -lpmemobj -lpthread
-CMD ["./main", "a.txt", "multithread"]
-RUN cd /																															
 WORKDIR /
 RUN mkdir /mnt/ramdisk
 # RUN sudo mount -t tmpfs -o size=512m tmpfs /mnt/ramdisk
-
-#seastar
-RUN dnf install -y \
-    git \
-    make \
-    cmake \
-    gcc-c++ \
-    clang \
-    ragel \
-    ninja-build \
-    python3 \
-    gnutls-devel \
-    hwloc \
-    hwloc-devel \
-    numactl-devel \
-    boost-devel \
-    cryptopp-devel \
-    zlib-devel \
-    xfsprogs-devel \
-    lz4-devel \
-    systemtap-sdt-devel \
-    protobuf-compiler \
-    protobuf-devel \
-    lksctp-tools-devel \
-    yaml-cpp-devel \
-    libasan \
-    libubsan \
-    libaio-devel \
-    libpciaccess-devel \
-    libxml2-devel \
-	c-ares-devel \
-	stow \
-	dpdk-devel \
-	memcached \
-	vim
-
-RUN git clone --recurse-submodules https://github.com/scylladb/seastar.git
-RUN cd seastar
-WORKDIR /seastar
-RUN dnf install -y libaio-devel \
-		ninja-build \
-		ragel \
-		hwloc-devel \
-		numactl-devel \
-		libpciaccess-devel \
-		cryptopp-devel \
-		gnutls-c++ \
-		gnutls-devel \
-		boost-devel \
-		lksctp-tools-devel \
-		xen-devel \
-		libasan \
-		libubsan \
-		libxml2-devel \
-		xfsprogs-devel
-
-RUN ./install-dependencies.sh
-RUN ./configure.py
-RUN ninja -C build/release
-RUN dnf install -y nc
 
 # NVMHashMap tests
 RUN dnf install -y gtest-devel
