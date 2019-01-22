@@ -216,9 +216,9 @@ private:
 void *keyboard(void *arg) {
   std::string command;
   while(true) {
-    std::cin>>command;
-    std::vector<std::string> cmd = deserialize(command);
-    if (cmd[0] == "test" && cmd.size() >= 4) {
+    std::getline(std::cin, command);
+    std::vector<std::string> cmd = deserialize(command, ' ');
+    if (cmd[0] == "test" && cmd.size() >= 3) {
       std::cout<<"test on "<<cmd[1]<<":"<<cmd[2]<<std::endl;
       nodes_map[cmd[1] + ":" + cmd[2]]._session->write("test");
     }
