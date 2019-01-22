@@ -16,6 +16,7 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/program_options/variables_map.hpp>
 #include <boost/algorithm/string.hpp>
+#include <pthread.h>
 #include "../map/NvmHashMap.hpp"
 
 // struct root
@@ -145,6 +146,9 @@ public:
             }
           }
         }
+        if (cmd[0] == "test") {
+          std::cout<<"test"<<std::endl;
+        }
         //do_write(length);
       }
       memset(data_, 0, max_length);
@@ -209,6 +213,25 @@ private:
   tcp::acceptor acceptor_;
 };
 
+void *keyboard(void *arg) {
+  std::string command;
+  while(true) {
+    std::cin>>command;
+    std::vector<std::string> cmd = deserialize(command);
+    if (cmd[0] == "test" && cmd.size() >= 4) {
+      std::cout<<"test on "<<cmd[1]<<":"<<cmd[2]<<std::endl;
+      nodes_map[cmd[1] + ":" + cmd[2]]._session->write("test");
+    }
+    if (cmd[0] == "ls") {
+      std::string map = serialize(nodes_map);
+      std::cout<<map<<std::endl;
+    }
+    if (cmd[0] == "q") {
+      break;
+    }
+  }
+}
+
 int main(int argc, char *argv[])
 {
   // pmem::obj::pool<root> pop;
@@ -230,6 +253,9 @@ int main(int argc, char *argv[])
 
   bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
   bpo::notify(vm);
+
+  pthread_t keyboard_thread;
+	pthread_create(&keyboard_thread, NULL, keyboard, NULL);
 
   std::cout << "TCP server listen on port: " << vm["port"].as<std::string>() << std::endl;
 
