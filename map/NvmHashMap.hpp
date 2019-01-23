@@ -15,6 +15,7 @@
 #include <string.h>
 #include <cmath>
 #include <shared_mutex>
+#include <cstdlib>
 
 template<class, class>
 class Iterator;
@@ -82,7 +83,7 @@ private:
 
     unsigned long long int hash(K key) {
         unsigned long long int keyPositive = (unsigned long long int) std::hash<K>()(key);
-        return abs(keyPositive);
+        return fabs(keyPositive);
     }
 
     NvmHashMap<K, V> *getPtr() {
