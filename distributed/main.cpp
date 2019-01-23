@@ -21,13 +21,6 @@
 
 const int32_t range = 10000;
 
-// struct root
-// {
-//     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
-// };
-
-// pmem::obj::persistent_ptr<root> root_ptr;
-
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
 
@@ -214,8 +207,9 @@ public:
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()),
     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-      if (!ec)
+      if (ec)
       {
+        std::cout<<ec<<std::endl;
       }
     });
   }
@@ -276,17 +270,6 @@ void *keyboard(void *arg) {
 
 int main(int argc, char *argv[])
 {
-  // pmem::obj::pool<root> pop;
-  // pop = pmem::obj::pool<root>::create("file.txt", "", PMEMOBJ_MIN_POOL, 0777);
-
-  // root_ptr = pop.root();
-
-  // pmem::obj::transaction::run(pop, [&] {
-  //     root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
-  // });
-  // root_ptr->pmap->insertNew(1, 42);
-  // std::cout << root_ptr->pmap->get(1) << std::endl;
-
   desc.add_options()
     ("port", bpo::value<std::string>()->default_value("10000"),"TCP server port")
     ("my_addr", bpo::value<std::string>()->required(), "My address")
