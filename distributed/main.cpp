@@ -34,6 +34,7 @@ bool file_exists(const char *fname) {
   }
   return false;
 }
+const int32_t range = 10000;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
@@ -70,13 +71,20 @@ public:
     this->port = p;
     this->_session = nullptr;
   }
+  node(std::string a, std::string p, std::int32_t h)
+  {
+    this->_session = nullptr;
+    this->addr = a;
+    this->port = p;
+    this->hash = h;
+  }
   node()
   {
     this->_session = nullptr;
   }
 };
 
-int32_t Hash(uint64_t key, int32_t num_buckets = 360) {
+int32_t hash(uint64_t key, int32_t num_buckets = 360) {
   int64_t b = 1;
   int64_t j = 0;
   while (j< num_buckets) {
@@ -85,10 +93,6 @@ int32_t Hash(uint64_t key, int32_t num_buckets = 360) {
       j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
   }
   return b;
-}
-
-uint64_t Hash(std::string) {
-
 }
 
 std::unordered_map<std::string, node> nodes_map;
@@ -122,6 +126,18 @@ std::vector<std::string> deserialize(std::string msg, char split = '_')
   return vec;
 }
 
+uint32_t ip_hash(std::string ip, std::string port) {
+  std::vector<std::string> vec = deserialize(ip, '.');
+  uint64_t result = 0;
+  result += ((uint64_t)std::stoi(vec[0]) * 16777216);
+  result += ((uint64_t)std::stoi(vec[1]) * 65536);
+  result += ((uint64_t)std::stoi(vec[2]) * 256);
+  result += ((uint64_t)std::stoi(vec[3]));
+  result *= (uint64_t)std::stoi(port);
+  return hash(result, range);
+}
+
+
 long timestamp()
 {
   return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
@@ -145,8 +161,8 @@ public:
   {
     tcp::resolver resolver(io_context);
     boost::asio::connect(socket_, resolver.resolve(addr, port));
-    write("connect_" + std::to_string(timestamp()) + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>());
-    node n = node(this, addr, port);
+    write("connect_" + std::to_string(timestamp()) + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>() + "_" + std::to_string(nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()].hash));
+    node n = node(this, addr, port, ip_hash(addr, port));
     nodes_map[addr + ":" + port] = n;
     do_read();
   }
@@ -162,7 +178,8 @@ public:
         if (cmd[0] == "connect")
         {
           std::cout << "New node: " << cmd[2] << ":" << cmd[3] << std::endl;
-          node n = node(this, cmd[2], cmd[3]);
+          std::cout << cmd[4] << std::endl;
+          node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0));
           nodes_map[cmd[2] + ":" + cmd[3]] = n;
           write("nodes_" + std::to_string(timestamp()) + "_" + serialize(nodes_map));
         }
@@ -205,8 +222,9 @@ public:
     auto self(shared_from_this());
     boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()),
     [this, self](boost::system::error_code ec, std::size_t /*length*/) {
-      if (!ec)
+      if (ec)
       {
+        std::cout<<ec<<std::endl;
       }
     });
   }
@@ -323,6 +341,7 @@ void *keyboard(void *arg) {
       break;
     }
   }
+  return nullptr;
 }
 
 int main(int argc, char *argv[])
@@ -351,7 +370,6 @@ int main(int argc, char *argv[])
           root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
       });
     }
-
   desc.add_options()
     ("port", bpo::value<std::string>()->default_value("10000"),"TCP server port")
     ("my_addr", bpo::value<std::string>()->required(), "My address")
@@ -367,11 +385,13 @@ int main(int argc, char *argv[])
   std::cout << "[MAP] Hashmap interface: \n"
                "[MAP] insert K V\n[MAP] get K\n[MAP] remove K\n[MAP] iterate\n" << std::endl;
   std::cout << "TCP server listening on port: " << vm["port"].as<std::string>() << std::endl;
-
+  std::cout << ip_hash(vm["my_addr"].as<std::string>(),vm["port"].as<std::string>()) << std::endl;
 
   try
   {
-    nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()] = node(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>());
+    nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()] = node(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>(), ip_hash(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>()));
+
+
     if (vm["server"].as<std::string>().length() > 0 && vm["server_port"].as<std::string>().length() > 0)
     {
       tcp::socket sock(io_context);
