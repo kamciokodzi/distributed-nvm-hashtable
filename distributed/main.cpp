@@ -34,7 +34,7 @@ bool file_exists(const char *fname) {
   }
   return false;
 }
-const int32_t range = 10000;
+const int32_t range = 360;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
@@ -96,6 +96,31 @@ int32_t hash(uint64_t key, int32_t num_buckets = 360) {
 }
 
 std::unordered_map<std::string, node> nodes_map;
+
+std::string find_node_key(int32_t hash) {
+  std::string result;
+  int32_t temp = range + 1;
+  std::string max_result;
+  int32_t max = 0;
+  for (const auto &[key, value] : nodes_map)
+  {
+    if (value.hash >= hash && value.hash < temp) {
+      temp = value.hash;
+      result = key;
+    }
+    if (value.hash > max) {
+      max = value.hash;
+      max_result = key;
+    }
+  }
+  if (temp == range + 1) {
+      result = max_result;
+  }
+  if (nodes_map[result].addr == vm["my_addr"].as<std::string>() && nodes_map[result].port == vm["port"].as<std::string>()) {
+    return "";
+  }
+  return result;
+}
 
 std::string serialize(std::vector<std::string> vec, char split = '_')
 {
@@ -195,6 +220,58 @@ public:
             }
           }
         }
+        if (cmd[0] == "get") {
+          try {
+            int value = root_ptr->pmap->get(std::stoi(cmd[2]));
+            //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << value << std::endl;
+            write("getResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + std::to_string(value));
+          }
+          catch (...) {
+            //std::cout << "[MAP] Element not found" << std::endl;
+            write("getResultBad_" + std::to_string(timestamp()) + "_" + cmd[2]);
+          }
+        }
+        if (cmd[0] == "insert") {
+          std::cout<<"insert " << std::stoi(cmd[2]) << std::stoi(cmd[3]) << std::endl;
+          try {
+            root_ptr->pmap->insertNew(std::stoi(cmd[2]), stoi(cmd[3]));
+            //std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+            write("insertResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + cmd[3]);
+          }
+          catch (...) {
+            //std::cout << "[MAP] Element not found" << std::endl;
+            write("insertResultBad_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + cmd[3]);
+          }
+        }
+        if (cmd[0] == "remove") {
+          try {
+            int value = root_ptr->pmap->remove(std::stoi(cmd[2]));
+            //std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+            write("removeResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + std::to_string(value));
+          }
+          catch (...) {
+            //std::cout << "[MAP] Element not found" << std::endl;
+            write("removeResultBad_" + std::to_string(timestamp()) + "_" + cmd[2]);
+          }
+        }
+        if (cmd[0] == "getResult") {
+          std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+        }
+        if (cmd[0] == "getResultBad") {
+          std::cout << "[MAP] Element not found key=" << cmd[2] << std::endl;
+        }
+        if (cmd[0] == "insertResult") {
+          std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+        }
+        if (cmd[0] == "insertResultBad") {
+          std::cout << "[MAP] Error inserting element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+        }
+        if (cmd[0] == "removeResult") {
+          std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+        }
+        if (cmd[0] == "removeResultBad") {
+          std::cout << "[MAP] Error removing element with key=" << cmd[2] << std::endl;
+        }
         if (cmd[0] == "test") {
           std::cout<<"test"<<std::endl;
         }
@@ -227,6 +304,15 @@ public:
         std::cout<<ec<<std::endl;
       }
     });
+  }
+  void get(int key) {
+    write("get_" + std::to_string(timestamp()) + "_" + std::to_string(key));
+  }
+  void insert(int key, int value) {
+    write("insert_" + std::to_string(timestamp()) + "_" + std::to_string(key) + "_" + std::to_string(value));
+  }
+  void remove(int key) {
+    write("remove_" + std::to_string(timestamp()) + "_" + std::to_string(key));
   }
 
   tcp::socket socket_;
@@ -283,8 +369,21 @@ void *keyboard(void *arg) {
       if (cmd.size() < 3) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
-        root_ptr->pmap->insertNew(std::stoi(cmd[1]), stoi(cmd[2]));
-        std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+        try {
+          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::cout<<"Server: ";
+          if (location != "") {
+            std::cout<< location<< std::endl;
+            nodes_map[location]._session->insert(std::stoi(cmd[1]), std::stoi(cmd[2]));
+          } else {
+            std::cout<< "local" << std::endl;
+            root_ptr->pmap->insertNew(std::stoi(cmd[1]), stoi(cmd[2]));
+            std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+          }
+        }
+        catch (...) {
+          std::cout << "[MAP] Element not found" << std::endl;
+        }
       }
     }
 
@@ -293,8 +392,16 @@ void *keyboard(void *arg) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
         try {
-          int value = root_ptr->pmap->get(std::stoi(cmd[1]));
-          std::cout << "[MAP] Found element with key=" << cmd[1] << " and value=" << value << std::endl;
+          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::cout<<"Server: ";
+          if (location != "") {
+            std::cout<< location<< std::endl;
+            nodes_map[location]._session->get(std::stoi(cmd[1]));
+          } else {
+            std::cout<< "local" << std::endl;            
+            int value = root_ptr->pmap->get(std::stoi(cmd[1]));
+            std::cout << "[MAP] Found element with key=" << cmd[1] << " and value=" << value << std::endl;
+          }
         }
         catch (...) {
           std::cout << "[MAP] Element not found" << std::endl;
@@ -307,8 +414,16 @@ void *keyboard(void *arg) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
         try {
-          int value = root_ptr->pmap->remove(std::stoi(cmd[1]));
-          std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::cout<<"Server: ";
+          if (location != "") {
+            std::cout<< location<< std::endl;
+            nodes_map[location]._session->remove(std::stoi(cmd[1]));
+          } else {
+            std::cout<< "local" << std::endl;
+            int value = root_ptr->pmap->remove(std::stoi(cmd[1]));
+            std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+          }
         }
         catch (...) {
           std::cout << "[MAP] Element not found" << std::endl;
@@ -346,30 +461,6 @@ void *keyboard(void *arg) {
 
 int main(int argc, char *argv[])
 {
-   pmem::obj::pool<root> pop;
-   std::string path = "hashmapFile";
-
-   try {
-     if (!file_exists(path.c_str())) {
-       std::cout << "[MAP] File doesn't exists, creating pool" << std::endl;
-       pop = pmem::obj::pool<root>::create(path, "",
-                                          PMEMOBJ_MIN_POOL * 100, 0777);
-     } else {
-       std::cout << "[MAP] File exists, opening pool" << std::endl;
-       pop = pmem::obj::pool<root>::open(path, "");
-     }
-   } catch (pmem::pool_error &e) {
-     std::cerr << e.what() << std::endl;
-     return 1;
-   }
-
-   root_ptr = pop.root();
-
-   if (!root_ptr->pmap) {
-     pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;
-          root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
-      });
-    }
   desc.add_options()
     ("port", bpo::value<std::string>()->default_value("10000"),"TCP server port")
     ("my_addr", bpo::value<std::string>()->required(), "My address")
@@ -378,6 +469,31 @@ int main(int argc, char *argv[])
 
   bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
   bpo::notify(vm);
+
+  pmem::obj::pool<root> pop;
+  std::string path = "hashmapFile"+vm["port"].as<std::string>();
+
+  try {
+    if (!file_exists(path.c_str())) {
+      std::cout << "[MAP] File doesn't exists, creating pool" << std::endl;
+      pop = pmem::obj::pool<root>::create(path, "",
+                                        PMEMOBJ_MIN_POOL * 100, 0777);
+    } else {
+      std::cout << "[MAP] File exists, opening pool" << std::endl;
+      pop = pmem::obj::pool<root>::open(path, "");
+    }
+  } catch (pmem::pool_error &e) {
+    std::cerr << e.what() << std::endl;
+    return 1;
+  }
+
+  root_ptr = pop.root();
+
+  if (!root_ptr->pmap) {
+    pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;
+        root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
+    });
+  }
 
   pthread_t keyboard_thread;
 	pthread_create(&keyboard_thread, NULL, keyboard, NULL);
