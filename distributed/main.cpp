@@ -41,6 +41,14 @@ public:
   session *_session;
   std::string addr;
   std::string port;
+  std::int32_t hash;
+  node(session *s, std::string a, std::string p, std::int32_t h)
+  {
+    this->_session = s;
+    this->addr = a;
+    this->port = p;
+    this->hash = h;
+  }
   node(session *s, std::string a, std::string p)
   {
     this->_session = s;
@@ -58,6 +66,21 @@ public:
     this->_session = nullptr;
   }
 };
+
+int32_t Hash(uint64_t key, int32_t num_buckets = 360) {
+  int64_t b = 1;
+  int64_t j = 0;
+  while (j< num_buckets) {
+      b = j;
+      key = key * 2862933555777941757ULL + 1;
+      j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+  }
+  return b;
+}
+
+uint64_t Hash(std::string) {
+
+}
 
 std::unordered_map<std::string, node> nodes_map;
 
