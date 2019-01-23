@@ -19,6 +19,21 @@
 #include <pthread.h>
 #include "../map/NvmHashMap.hpp"
 
+ struct root
+ {
+     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
+ };
+
+ pmem::obj::persistent_ptr<root> root_ptr;
+
+bool file_exists(const char *fname) {
+  FILE *file;
+  if ((file = fopen(fname, "r"))) {
+    fclose(file);
+    return true;
+  }
+  return false;
+}
 const int32_t range = 10000;
 
 using boost::asio::ip::tcp;
@@ -253,14 +268,75 @@ void *keyboard(void *arg) {
   while(true) {
     std::getline(std::cin, command);
     std::vector<std::string> cmd = deserialize(command, ' ');
+
     if (cmd[0] == "test" && cmd.size() >= 3) {
       std::cout<<"test on "<<cmd[1]<<":"<<cmd[2]<<std::endl;
       nodes_map[cmd[1] + ":" + cmd[2]]._session->write("test");
     }
+
     if (cmd[0] == "ls") {
       std::string map = serialize(nodes_map);
       std::cout<<map<<std::endl;
     }
+
+    if (cmd[0] == "insert") {
+      if (cmd.size() < 3) {
+        std::cout << "[MAP] Not enough values" << std::endl;
+      } else {
+        root_ptr->pmap->insertNew(std::stoi(cmd[1]), stoi(cmd[2]));
+        std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+      }
+    }
+
+    if (cmd[0] == "get") {
+      if (cmd.size() < 2) {
+        std::cout << "[MAP] Not enough values" << std::endl;
+      } else {
+        try {
+          int value = root_ptr->pmap->get(std::stoi(cmd[1]));
+          std::cout << "[MAP] Found element with key=" << cmd[1] << " and value=" << value << std::endl;
+        }
+        catch (...) {
+          std::cout << "[MAP] Element not found" << std::endl;
+        }
+      }
+    }
+
+    if (cmd[0] == "remove") {
+      if (cmd.size() < 2) {
+        std::cout << "[MAP] Not enough values" << std::endl;
+      } else {
+        try {
+          int value = root_ptr->pmap->remove(std::stoi(cmd[1]));
+          std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+        }
+        catch (...) {
+          std::cout << "[MAP] Element not found" << std::endl;
+        }
+      }
+    }
+
+
+    if (cmd[0] == "iterate") {
+
+      Iterator<int,int> it(root_ptr->pmap);
+      try {
+        std::cout <<"[MAP] " << it.get() << " ";
+      }
+      catch (...) {
+      }
+
+      while (it.next()) {
+        try {
+          std::cout << it.get() << " ";
+        }
+        catch (...) {
+        }
+      }
+      std::cout << std::endl;
+    }
+
+
     if (cmd[0] == "q") {
       break;
     }
@@ -270,6 +346,30 @@ void *keyboard(void *arg) {
 
 int main(int argc, char *argv[])
 {
+   pmem::obj::pool<root> pop;
+   std::string path = "hashmapFile";
+
+   try {
+     if (!file_exists(path.c_str())) {
+       std::cout << "[MAP] File doesn't exists, creating pool" << std::endl;
+       pop = pmem::obj::pool<root>::create(path, "",
+                                          PMEMOBJ_MIN_POOL * 100, 0777);
+     } else {
+       std::cout << "[MAP] File exists, opening pool" << std::endl;
+       pop = pmem::obj::pool<root>::open(path, "");
+     }
+   } catch (pmem::pool_error &e) {
+     std::cerr << e.what() << std::endl;
+     return 1;
+   }
+
+   root_ptr = pop.root();
+
+   if (!root_ptr->pmap) {
+     pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;
+          root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
+      });
+    }
   desc.add_options()
     ("port", bpo::value<std::string>()->default_value("10000"),"TCP server port")
     ("my_addr", bpo::value<std::string>()->required(), "My address")
@@ -282,7 +382,9 @@ int main(int argc, char *argv[])
   pthread_t keyboard_thread;
 	pthread_create(&keyboard_thread, NULL, keyboard, NULL);
 
-  std::cout << "TCP server listen on port: " << vm["port"].as<std::string>() << std::endl;
+  std::cout << "[MAP] Hashmap interface: \n"
+               "[MAP] insert K V\n[MAP] get K\n[MAP] remove K\n[MAP] iterate\n" << std::endl;
+  std::cout << "TCP server listening on port: " << vm["port"].as<std::string>() << std::endl;
   std::cout << ip_hash(vm["my_addr"].as<std::string>(),vm["port"].as<std::string>()) << std::endl;
 
   try
