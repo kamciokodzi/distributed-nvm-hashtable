@@ -200,6 +200,7 @@ public:
         std::shared_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
         pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
 
+
         while (true) {
             if (ptr == nullptr) {
                 break;
