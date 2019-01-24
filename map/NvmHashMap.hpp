@@ -17,6 +17,22 @@
 #include <shared_mutex>
 #include <cstdlib>
 
+template<class T>
+int64_t typeToInteger(T arg);
+
+template <>
+int64_t typeToInteger(std::string arg)
+{
+    int64_t result = 0;
+    for(int i = 0; i < arg.length(); i++) {
+        result += pow(arg[i], i);
+    }
+    return result;
+}
+
+template <>
+int64_t typeToInteger(int arg) {return arg;}
+
 template<class, class>
 class Iterator;
 
@@ -43,7 +59,7 @@ public:
 template<class K, class V>
 class Segment {
 public:
-    pmem::obj::p<int> hash;
+    pmem::obj::p<int32_t> hash;
     pmem::obj::p<int> size = 0;
     pmem::obj::persistent_ptr <SegmentObject<K, V>> head = nullptr;
 };
@@ -81,9 +97,17 @@ private:
     pmem::obj::persistent_ptr <ArrayOfSegments<K, V>[] > arrayOfSegments;
     pmem::obj::persistent_ptr <pmem::obj::shared_mutex[]> arrayOfMutex;
 
-    unsigned long long int hash(K key) {
-        unsigned long long int keyPositive = (unsigned long long int) std::hash<K>()(key);
-        return fabs(keyPositive);
+    int32_t hash(K keyString) {
+        int64_t key = typeToInteger(keyString);
+        int32_t num_buckets = 10000000;
+        int64_t b = 1;
+        int64_t j = 0;
+        while (j < num_buckets) {
+            b = j;
+            key = key * 2862933555777941757ULL + 1;
+            j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+        }
+        return fabs(b);
     }
 
     NvmHashMap<K, V> *getPtr() {

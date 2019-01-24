@@ -24,20 +24,6 @@ bool file_exists(const char *fname) {
 
 pmem::obj::persistent_ptr<root> root_ptr;
 
-void insertFromThread(int tid)
-{
-    for(int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
-        root_ptr->pmap->insertNew(i*THREADS_COUNT+tid, i*THREADS_COUNT+tid);
-    }
-}
-
-void removeFromThread(int tid)
-{
-    for(int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
-        root_ptr->pmap->remove(i*THREADS_COUNT+tid);
-    }
-}
-
 TEST(NvmHashMapInt, InsertRemoveTest) {
     for (int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
         root_ptr->pmap->insertNew(i, i+2);

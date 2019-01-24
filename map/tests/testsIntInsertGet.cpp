@@ -21,13 +21,6 @@ bool file_exists(const char *fname) {
     return false;
 }
 
-void insertFromThread(int tid)
-{
-    for(int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
-        root_ptr->pmap->insertNew(i*THREADS_COUNT+tid, i*THREADS_COUNT+tid);
-    }
-}
-
 TEST(NvmHashMapInt, InsertGetTest) {
     for (int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
         root_ptr->pmap->insertNew(i, i+2);
