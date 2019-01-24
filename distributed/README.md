@@ -7,10 +7,10 @@ sh build.sh
 ```
 First node
 ```
-./main --my\_addr={ip}
+./main --my_addr={ip}
 ```
 To connect to cluster
 ```
-./main --my\_addr={ip} --port={port} --server{server\_ip} --server\_port{server\_port}
+./main --my_addr={ip} --port={port} --server{server_ip} --server_port{server_port}
 ```
 
