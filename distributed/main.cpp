@@ -21,7 +21,7 @@
 
  struct root
  {
-     pmem::obj::persistent_ptr<NvmHashMap<int, int> > pmap;
+     pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmap;
  };
 
  pmem::obj::persistent_ptr<root> root_ptr;
@@ -85,6 +85,22 @@ public:
 };
 
 int32_t hash(uint64_t key, int32_t num_buckets = 360) {
+  int64_t b = 1;
+  int64_t j = 0;
+  while (j< num_buckets) {
+      b = j;
+      key = key * 2862933555777941757ULL + 1;
+      j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+  }
+  return b;
+}
+int32_t hash(std::string arg, int32_t num_buckets = 360) {
+
+  uint64_t key = 0;
+  for(int i = 0; i < arg.length(); i++) {
+      key += pow(arg[i], i);
+  }
+
   int64_t b = 1;
   int64_t j = 0;
   while (j< num_buckets) {
@@ -222,9 +238,9 @@ public:
         }
         if (cmd[0] == "get") {
           try {
-            int value = root_ptr->pmap->get(std::stoi(cmd[2]));
+            std::string value = root_ptr->pmap->get(cmd[2]);
             //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << value << std::endl;
-            write("getResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + std::to_string(value));
+            write("getResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + value);
           }
           catch (...) {
             //std::cout << "[MAP] Element not found" << std::endl;
@@ -232,9 +248,9 @@ public:
           }
         }
         if (cmd[0] == "insert") {
-          std::cout<<"insert " << std::stoi(cmd[2]) << std::stoi(cmd[3]) << std::endl;
+          std::cout<<"insert " << cmd[2] << cmd[3] << std::endl;
           try {
-            root_ptr->pmap->insertNew(std::stoi(cmd[2]), stoi(cmd[3]));
+            root_ptr->pmap->insertNew(cmd[2], cmd[3]);
             //std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
             write("insertResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + cmd[3]);
           }
@@ -245,9 +261,9 @@ public:
         }
         if (cmd[0] == "remove") {
           try {
-            int value = root_ptr->pmap->remove(std::stoi(cmd[2]));
+            std::string value = root_ptr->pmap->remove(cmd[2]);
             //std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
-            write("removeResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + std::to_string(value));
+            write("removeResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + value);
           }
           catch (...) {
             //std::cout << "[MAP] Element not found" << std::endl;
@@ -305,14 +321,14 @@ public:
       }
     });
   }
-  void get(int key) {
-    write("get_" + std::to_string(timestamp()) + "_" + std::to_string(key));
+  void get(std::string key) {
+    write("get_" + std::to_string(timestamp()) + "_" + key);
   }
-  void insert(int key, int value) {
-    write("insert_" + std::to_string(timestamp()) + "_" + std::to_string(key) + "_" + std::to_string(value));
+  void insert(std::string key, std::string value) {
+    write("insert_" + std::to_string(timestamp()) + "_" + key + "_" + value);
   }
-  void remove(int key) {
-    write("remove_" + std::to_string(timestamp()) + "_" + std::to_string(key));
+  void remove(std::string key) {
+    write("remove_" + std::to_string(timestamp()) + "_" + key);
   }
 
   tcp::socket socket_;
@@ -370,14 +386,14 @@ void *keyboard(void *arg) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
         try {
-          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::string location = find_node_key(hash(cmd[1]));
           std::cout<<"Server: ";
           if (location != "") {
             std::cout<< location<< std::endl;
-            nodes_map[location]._session->insert(std::stoi(cmd[1]), std::stoi(cmd[2]));
+            nodes_map[location]._session->insert(cmd[1], cmd[2]);
           } else {
             std::cout<< "local" << std::endl;
-            root_ptr->pmap->insertNew(std::stoi(cmd[1]), stoi(cmd[2]));
+            root_ptr->pmap->insertNew(cmd[1], cmd[2]);
             std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
           }
         }
@@ -392,14 +408,14 @@ void *keyboard(void *arg) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
         try {
-          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::string location = find_node_key(hash(cmd[1]));
           std::cout<<"Server: ";
           if (location != "") {
             std::cout<< location<< std::endl;
-            nodes_map[location]._session->get(std::stoi(cmd[1]));
+            nodes_map[location]._session->get(cmd[1]);
           } else {
             std::cout<< "local" << std::endl;            
-            int value = root_ptr->pmap->get(std::stoi(cmd[1]));
+            std::string value = root_ptr->pmap->get(cmd[1]);
             std::cout << "[MAP] Found element with key=" << cmd[1] << " and value=" << value << std::endl;
           }
         }
@@ -414,14 +430,14 @@ void *keyboard(void *arg) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
         try {
-          std::string location = find_node_key(hash(std::stoi(cmd[1])));
+          std::string location = find_node_key(hash(cmd[1]));
           std::cout<<"Server: ";
           if (location != "") {
             std::cout<< location<< std::endl;
-            nodes_map[location]._session->remove(std::stoi(cmd[1]));
+            nodes_map[location]._session->remove(cmd[1]);
           } else {
             std::cout<< "local" << std::endl;
-            int value = root_ptr->pmap->remove(std::stoi(cmd[1]));
+            std::string value = root_ptr->pmap->remove(cmd[1]);
             std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
           }
         }
@@ -434,7 +450,7 @@ void *keyboard(void *arg) {
 
     if (cmd[0] == "iterate") {
 
-      Iterator<int,int> it(root_ptr->pmap);
+      Iterator<std::string,std::string> it(root_ptr->pmap);
       try {
         std::cout <<"[MAP] " << it.get() << " ";
       }
@@ -491,7 +507,7 @@ int main(int argc, char *argv[])
 
   if (!root_ptr->pmap) {
     pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;
-        root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<int, int> >(8);
+        root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<std::string, std::string> >(8);
     });
   }
 
