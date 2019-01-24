@@ -1,12 +1,3 @@
-// async_tcp_echo_server.cpp
-// ~~~~~~~~~~~~~~~~~~~~~~~~~
-//
-// Copyright (c) 2003-2017 Christopher M. Kohlhoff (chris at kohlhoff dot com)
-//
-// Distributed under the Boost Software License, Version 1.0. (See accompanying
-// file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-
 #include <cstdlib>
 #include <iostream>
 #include <memory>
@@ -17,11 +8,16 @@
 #include <boost/program_options/variables_map.hpp>
 #include <boost/algorithm/string.hpp>
 #include <pthread.h>
+#include <unistd.h>
+#include <mutex>
+#include <shared_mutex>
 #include "../map/NvmHashMap.hpp"
+
+#define REPLICATION_FACTOR 3
 
  struct root
  {
-     pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmap;
+    pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string> > pmap[REPLICATION_FACTOR];
  };
 
  pmem::obj::persistent_ptr<root> root_ptr;
@@ -112,12 +108,14 @@ int32_t hash(std::string arg, int32_t num_buckets = 360) {
 }
 
 std::unordered_map<std::string, node> nodes_map;
+std::shared_mutex nodes_mutex;
 
 std::string find_node_key(int32_t hash) {
   std::string result;
   int32_t temp = range + 1;
   std::string max_result;
   int32_t max = 0;
+  std::shared_lock lock(nodes_mutex);
   for (const auto &[key, value] : nodes_map)
   {
     if (value.hash >= hash && value.hash < temp) {
@@ -183,6 +181,11 @@ long timestamp()
 {
   return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
+std::string str_timestamp()
+{
+  return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
+}
+
 
 class session
     : public std::enable_shared_from_this<session>
@@ -202,7 +205,8 @@ public:
   {
     tcp::resolver resolver(io_context);
     boost::asio::connect(socket_, resolver.resolve(addr, port));
-    write("connect_" + std::to_string(timestamp()) + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>() + "_" + std::to_string(nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()].hash));
+
+    write("connect_" + str_timestamp() + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>() + "_" + std::to_string(nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()].hash));
     node n = node(this, addr, port, ip_hash(addr, port));
     nodes_map[addr + ":" + port] = n;
     do_read();
@@ -220,13 +224,17 @@ public:
         {
           std::cout << "New node: " << cmd[2] << ":" << cmd[3] << std::endl;
           std::cout << cmd[4] << std::endl;
+
           node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0));
+          std::unique_lock lock(nodes_mutex);
           nodes_map[cmd[2] + ":" + cmd[3]] = n;
-          write("nodes_" + std::to_string(timestamp()) + "_" + serialize(nodes_map));
+          write("nodes_" + str_timestamp() + "_" + serialize(nodes_map));
+          lock.unlock();
         }
-        if (cmd[0] == "nodes")
+        else if (cmd[0] == "nodes")
         {
           std::cout << "Get nodes: " << data_ << std::endl;
+          std::unique_lock lock(nodes_mutex);
           for (int i = 2; i < cmd.size(); i+=2)
           {
             if (nodes_map.find(cmd[i] + ":" + cmd[i+1]) == nodes_map.end())
@@ -235,61 +243,67 @@ public:
               std::make_shared<session>(std::move(sock))->connect(cmd[i], cmd[i+1]);
             }
           }
+          lock.unlock();
         }
-        if (cmd[0] == "get") {
+
+        else if (cmd[0] == "get") {
           try {
-            std::string value = root_ptr->pmap->get(cmd[2]);
+            std::string value = root_ptr->pmap[0]->get(cmd[2]);
             //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << value << std::endl;
-            write("getResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + value);
+            write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
           }
           catch (...) {
             //std::cout << "[MAP] Element not found" << std::endl;
-            write("getResultBad_" + std::to_string(timestamp()) + "_" + cmd[2]);
+            write("getResultBad_" + str_timestamp() + "_" + cmd[2]);
           }
         }
-        if (cmd[0] == "insert") {
-          std::cout<<"insert " << cmd[2] << cmd[3] << std::endl;
+        else if (cmd[0] == "insert") {
           try {
-            root_ptr->pmap->insertNew(cmd[2], cmd[3]);
+            root_ptr->pmap[0]->insertNew(cmd[2], cmd[3]);
             //std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
-            write("insertResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + cmd[3]);
+            write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
           }
           catch (...) {
             //std::cout << "[MAP] Element not found" << std::endl;
-            write("insertResultBad_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + cmd[3]);
+            write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
           }
         }
-        if (cmd[0] == "remove") {
+        else if (cmd[0] == "remove") {
           try {
-            std::string value = root_ptr->pmap->remove(cmd[2]);
+            std::string value = root_ptr->pmap[0]->remove(cmd[2]);
             //std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
-            write("removeResult_" + std::to_string(timestamp()) + "_" + cmd[2] + "_" + value);
+            write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
           }
           catch (...) {
             //std::cout << "[MAP] Element not found" << std::endl;
-            write("removeResultBad_" + std::to_string(timestamp()) + "_" + cmd[2]);
+            write("removeResultBad_" + str_timestamp() + "_" + cmd[2]);
           }
         }
-        if (cmd[0] == "getResult") {
+        else if (cmd[0] == "getResult") {
           std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
         }
-        if (cmd[0] == "getResultBad") {
+        else if (cmd[0] == "getResultBad") {
           std::cout << "[MAP] Element not found key=" << cmd[2] << std::endl;
         }
-        if (cmd[0] == "insertResult") {
+        else if (cmd[0] == "insertResult") {
           std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
         }
-        if (cmd[0] == "insertResultBad") {
+        else if (cmd[0] == "insertResultBad") {
           std::cout << "[MAP] Error inserting element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
         }
-        if (cmd[0] == "removeResult") {
+        else if (cmd[0] == "removeResult") {
           std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
         }
-        if (cmd[0] == "removeResultBad") {
+        else if (cmd[0] == "removeResultBad") {
           std::cout << "[MAP] Error removing element with key=" << cmd[2] << std::endl;
         }
-        if (cmd[0] == "test") {
+        else if (cmd[0] == "test") {
           std::cout<<"test"<<std::endl;
+        }
+        else if (cmd[0] == "sleep") {
+          std::cout<<"Start sleep"<<std::endl;
+          usleep(15000000);
+          std::cout<<"Stop sleep"<<std::endl;
         }
         //do_write(length);
       }
@@ -322,13 +336,13 @@ public:
     });
   }
   void get(std::string key) {
-    write("get_" + std::to_string(timestamp()) + "_" + key);
+    write("get_" + str_timestamp() + "_" + key);
   }
   void insert(std::string key, std::string value) {
-    write("insert_" + std::to_string(timestamp()) + "_" + key + "_" + value);
+    write("insert_" + str_timestamp() + "_" + key + "_" + value);
   }
   void remove(std::string key) {
-    write("remove_" + std::to_string(timestamp()) + "_" + key);
+    write("remove_" + str_timestamp() + "_" + key);
   }
 
   tcp::socket socket_;
@@ -373,15 +387,27 @@ void *keyboard(void *arg) {
 
     if (cmd[0] == "test" && cmd.size() >= 3) {
       std::cout<<"test on "<<cmd[1]<<":"<<cmd[2]<<std::endl;
+
+      std::shared_lock lock(nodes_mutex);
       nodes_map[cmd[1] + ":" + cmd[2]]._session->write("test");
+      lock.unlock();
     }
 
-    if (cmd[0] == "ls") {
+    else if (cmd[0] == "sleep" && cmd.size() >= 3) {
+      std::cout<<"sleep on "<<cmd[1]<<":"<<cmd[2]<<std::endl;
+      std::unique_lock lock(nodes_mutex);
+      nodes_map[cmd[1] + ":" + cmd[2]]._session->write("sleep");
+      lock.unlock();
+    }
+
+    else if (cmd[0] == "ls") {
+      std::unique_lock lock(nodes_mutex);
       std::string map = serialize(nodes_map);
+      lock.unlock();
       std::cout<<map<<std::endl;
     }
 
-    if (cmd[0] == "insert") {
+    else if (cmd[0] == "insert") {
       if (cmd.size() < 3) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
@@ -390,10 +416,12 @@ void *keyboard(void *arg) {
           std::cout<<"Server: ";
           if (location != "") {
             std::cout<< location<< std::endl;
+            std::unique_lock lock(nodes_mutex);
             nodes_map[location]._session->insert(cmd[1], cmd[2]);
+            lock.unlock();
           } else {
             std::cout<< "local" << std::endl;
-            root_ptr->pmap->insertNew(cmd[1], cmd[2]);
+            root_ptr->pmap[0]->insertNew(cmd[1], cmd[2]);
             std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
           }
         }
@@ -403,7 +431,7 @@ void *keyboard(void *arg) {
       }
     }
 
-    if (cmd[0] == "get") {
+    else if (cmd[0] == "get") {
       if (cmd.size() < 2) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
@@ -415,7 +443,7 @@ void *keyboard(void *arg) {
             nodes_map[location]._session->get(cmd[1]);
           } else {
             std::cout<< "local" << std::endl;            
-            std::string value = root_ptr->pmap->get(cmd[1]);
+            std::string value = root_ptr->pmap[0]->get(cmd[1]);
             std::cout << "[MAP] Found element with key=" << cmd[1] << " and value=" << value << std::endl;
           }
         }
@@ -425,7 +453,7 @@ void *keyboard(void *arg) {
       }
     }
 
-    if (cmd[0] == "remove") {
+    else if (cmd[0] == "remove") {
       if (cmd.size() < 2) {
         std::cout << "[MAP] Not enough values" << std::endl;
       } else {
@@ -434,10 +462,12 @@ void *keyboard(void *arg) {
           std::cout<<"Server: ";
           if (location != "") {
             std::cout<< location<< std::endl;
+            std::unique_lock lock(nodes_mutex);
             nodes_map[location]._session->remove(cmd[1]);
+            lock.unlock();
           } else {
             std::cout<< "local" << std::endl;
-            std::string value = root_ptr->pmap->remove(cmd[1]);
+            std::string value = root_ptr->pmap[0]->remove(cmd[1]);
             std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
           }
         }
@@ -448,9 +478,9 @@ void *keyboard(void *arg) {
     }
 
 
-    if (cmd[0] == "iterate") {
+    else if (cmd[0] == "iterate") {
 
-      Iterator<std::string,std::string> it(root_ptr->pmap);
+      Iterator<std::string,std::string> it(root_ptr->pmap[0]);
       try {
         std::cout <<"[MAP] " << it.get() << " ";
       }
@@ -468,7 +498,7 @@ void *keyboard(void *arg) {
     }
 
 
-    if (cmd[0] == "q") {
+    else if (cmd[0] == "q") {
       break;
     }
   }
@@ -505,9 +535,11 @@ int main(int argc, char *argv[])
 
   root_ptr = pop.root();
 
-  if (!root_ptr->pmap) {
-    pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;
-        root_ptr->pmap = pmem::obj::make_persistent<NvmHashMap<std::string, std::string> >(8);
+  if (!root_ptr->pmap[0]) {
+    pmem::obj::transaction::run(pop, [&] {std::cout << "[MAP] Creating NvmHashMap" << std::endl;      
+        for (int i = 0; i < REPLICATION_FACTOR; i++) {
+          root_ptr->pmap[i] = pmem::obj::make_persistent<NvmHashMap<std::string, std::string> >(8);
+        }
     });
   }
 
@@ -532,7 +564,18 @@ int main(int argc, char *argv[])
 
     server s(io_context, std::atoi(vm["port"].as<std::string>().c_str()));
 
-    io_context.run();
+    //io_context.run();
+    const unsigned cores = (int)std::thread::hardware_concurrency() - 1;
+
+    std::thread* threads = new std::thread[cores];
+
+    for (int i = 0; i < cores; i++) {
+      threads[i] = std::thread {[](){ io_context.run(); }};
+    }
+
+    for (int i = 0; i < cores; i++) {
+      threads[i].join();
+    }
   }
   catch (std::exception &e)
   {
