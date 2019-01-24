@@ -40,6 +40,7 @@ namespace bpo = boost::program_options;
 bpo::options_description desc("Allowed options");
 bpo::variables_map vm;
 boost::asio::io_context io_context;
+std::string my_addr;
 
 class session;
 
@@ -153,7 +154,9 @@ std::vector<std::string> find_nodes(int32_t hash)
   std::vector<std::string> result_vec;
   std::shared_lock lock(nodes_mutex);
 
-  for (int i = 0; i < REPLICATION_FACTOR; i++)
+  int count = std::min(REPLICATION_FACTOR, (int)nodes_map.size());
+
+  for (int i = 0; i < count; i++)
   {
     std::string result;
     int32_t temp = range + 1;
@@ -173,19 +176,13 @@ std::vector<std::string> find_nodes(int32_t hash)
         min_result = key;
       }
     }
+
     if (temp == range + 1)
     {
       result = min_result;
     }
 
-    if (nodes_map[result].addr == vm["my_addr"].as<std::string>() && nodes_map[result].port == vm["port"].as<std::string>())
-    {
-      result_vec.push_back("");
-    }
-    else
-    {
-      result_vec.push_back(result);
-    }
+    result_vec.push_back(result);
   }
   return result_vec;
 }
@@ -318,7 +315,7 @@ public:
                                   try
                                   {
                                     root_ptr->pmap[0]->insertNew(cmd[2], cmd[3]);
-                                    //std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+                                    std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
                                     write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
                                   }
                                   catch (...)
@@ -495,20 +492,23 @@ void *keyboard(void *arg)
       {
         try
         {
-          std::string location = find_node_key(hash(cmd[1]));
-          std::cout << "Server: ";
-          if (location != "")
-          {
-            std::cout << location << std::endl;
-            std::unique_lock lock(nodes_mutex);
-            nodes_map[location]._session->insert(cmd[1], cmd[2]);
-            lock.unlock();
-          }
-          else
-          {
-            std::cout << "local" << std::endl;
-            root_ptr->pmap[0]->insertNew(cmd[1], cmd[2]);
-            std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+          auto vec = find_nodes(hash(cmd[1]));
+          for (int i = 0; i < vec.size(); i++) {
+            std::string location = vec[i];//find_node_key(hash(cmd[1]));
+            std::cout << "Server: ";
+            if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+            {
+              std::cout << location << std::endl;
+              std::unique_lock lock(nodes_mutex);
+              nodes_map[location]._session->insert(cmd[1], cmd[2]);
+              lock.unlock();
+            }
+            else
+            {
+              std::cout << "local" << std::endl;
+              root_ptr->pmap[0]->insertNew(cmd[1], cmd[2]);
+              std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+            }
           }
         }
         catch (...)
@@ -528,7 +528,6 @@ void *keyboard(void *arg)
       {
         try
         {
-
           auto vec = find_nodes(hash(cmd[1]));
 
           for (int i = 0; i < vec.size(); i++)
@@ -567,20 +566,23 @@ void *keyboard(void *arg)
       {
         try
         {
-          std::string location = find_node_key(hash(cmd[1]));
-          std::cout << "Server: ";
-          if (location != "")
-          {
-            std::cout << location << std::endl;
-            std::unique_lock lock(nodes_mutex);
-            nodes_map[location]._session->remove(cmd[1]);
-            lock.unlock();
-          }
-          else
-          {
-            std::cout << "local" << std::endl;
-            std::string value = root_ptr->pmap[0]->remove(cmd[1]);
-            std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+          auto vec = find_nodes(hash(cmd[1]));
+          for (int i = 0; i < vec.size(); i++) {
+            std::string location = vec[i];//find_node_key(hash(cmd[1]));
+            std::cout << "Server: ";
+            if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+            {
+              std::cout << location << std::endl;
+              std::unique_lock lock(nodes_mutex);
+              nodes_map[location]._session->remove(cmd[1]);
+              lock.unlock();
+            }
+            else
+            {
+              std::cout << "local" << std::endl;
+              std::string value = root_ptr->pmap[0]->remove(cmd[1]);
+              std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
+            }
           }
         }
         catch (...)
@@ -629,6 +631,8 @@ int main(int argc, char *argv[])
 
   bpo::store(bpo::parse_command_line(argc, argv, desc), vm);
   bpo::notify(vm);
+
+  my_addr = vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>();
 
   pmem::obj::pool<root> pop;
   std::string path = "hashmapFile" + vm["port"].as<std::string>();
