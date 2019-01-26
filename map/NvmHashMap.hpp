@@ -344,15 +344,8 @@ public:
     Iterator(pmem::obj::persistent_ptr <NvmHashMap<K, V>> map) {
 
         mapPointer = map->getPtr();
-        currentArrayIndex = 0;
-        currentSegmentIndex = 0;
-        std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
-        currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
-        currentSegment = currentArray->segments[currentArrayIndex];
-        currentSegmentObject = currentSegment.head;
-	if(currentSegmentObject == nullptr) {
-	    next();
-	}
+        currentArrayIndex = -1;
+        currentSegmentIndex = -1;
     }
 
     V getValue() {
@@ -364,6 +357,14 @@ public:
     }
 
     bool next() {
+        if(currentArrayIndex == -1) {
+            currentArrayIndex = 0;
+            currentSegmentIndex = 0;
+            std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
+            currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
+            currentSegment = currentArray->segments[currentArrayIndex];
+            currentSegmentObject = currentSegment.head;
+        }
 	while (true) {
             if (currentSegmentObject != nullptr && currentSegmentObject->next != nullptr) {
                 std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
