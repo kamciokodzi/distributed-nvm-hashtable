@@ -1,11 +1,64 @@
-
 \chapter{Distribution}
 
-\section{Overview}
+\section{Assumptions}
+    decentralised network composed of many multithreaded nodes
+    many nodes able to connect and disconnect to the network, 
+    each node has a local version of \PHT and can iterate over it
+    each node can insert, get and remove data from others' nodes hashtables (insert, get, remove)
+    consistent hashing mechanism is used
+    replication (replication factor) 
+    
+\section{Decentralised and symmetrical network}
+    short description of how we achieve the assumptions made in 2nd chapter (stated by Dynamo)
+
 \section{Implementation details}
-\subsection{Decentralised and symmetrical network}
-\subsection{Node implementation}
-\section{Difficulties}
-\section{Connection to hashMap}
+    \subsection{Structure}  % listings and description
+        - class node: session, address, port, hash
+        - class session: connect(), read(), write()
+        - class server: accept()
+        - nodesMap: ([address, port], node)
+        
+    \subsection{Used methods}
+        boost: connect, read\_async, etc.
+        description of how these methods work
+        
+    \subsection{Communication protocol}
+        - when a node connects to an existing node, it gets a list of all known nodes in the system and connects to each of them
+        - messages are composed of: message type (connect, nodes, etc), timestamp, data
+        - serialising and serialising messages (converting a byte array to strings)
+        
+    \subsection{Consistent hashing}
+        \subsubsection{Hashing method}
+            pseudocode
+            source (article)
+            explanation
+            
+            We had to implement our own hashing function instead of using one from \std namespace because of its lack of determinism
+            
+        \subsubsection{Logical hashing ring}
+            
+\section{Conflict resolutions}
+    clock based on timestamp sent in each message
+    
+\section{Provided User interface}  % keyboard support
+    - [SERVER] ls (get list of connected nodes)
+    - [SERVER] q (stops listening for user input)
+    - [MAP] insert K V
+    - [MAP] get K
+    - [MAP] remove K
+    - [MAP] iterate
+
+\section{Connection of the hashmap to the node}
+
+\section{Testing environment}
+    \subsection{Docker}
+        to fasten the programming environment setup, we decided to use docker
+        we had to provide own image combining PMDK libraries, NVM emulation and boost library
+
+    \subsection{HPC}
+        access to hpc to test implemented system on a high performing machines
+    
 \section{Evaluation}
-\section{Summary}
+    stress tests: operating on many elements
+
+\section{Conclusions}
