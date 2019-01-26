@@ -15,7 +15,7 @@
 #include <string.h>
 #include <cmath>
 #include <shared_mutex>
-#include <cstdlib>
+#include <cstdlib> 
 
 template<class T>
 int64_t typeToInteger(T arg);
@@ -23,6 +23,18 @@ int64_t typeToInteger(T arg);
 template <>
 int64_t typeToInteger(std::string arg)
 {
+    int64_t result = 0;
+    for(int i = 0; i < arg.length(); i++) {
+        result += pow(arg[i], i);
+    }
+    return result;
+}
+
+
+template <>
+int64_t typeToInteger(const char* tab_arg)
+{
+    std::string arg(tab_arg);
     int64_t result = 0;
     for(int i = 0; i < arg.length(); i++) {
         result += pow(arg[i], i);
@@ -343,8 +355,12 @@ public:
 	}
     }
 
-    V get() {
+    V getValue() {
 	return currentSegmentObject->value.get_ro();
+    }
+
+    V getKey() {
+        return currentSegmentObject->key.get_ro();
     }
 
     bool next() {
