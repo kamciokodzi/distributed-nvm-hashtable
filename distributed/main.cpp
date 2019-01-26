@@ -279,6 +279,18 @@ public:
                                   std::unique_lock lock(nodes_mutex);
                                   nodes_map[cmd[2] + ":" + cmd[3]] = n;
                                   write("nodes_" + str_timestamp() + "_" + serialize(nodes_map));
+                                  
+                                  Iterator<std::string, std::string> it(root_ptr->pmap[0]);
+                                  try {
+                                    auto element = it.get();
+                                    while (it.next()) {
+                                      element = it.get();
+                                    }
+                                  } 
+                                  catch(...) {
+
+                                  }
+
                                   lock.unlock();
                                 }
                                 else if (cmd[0] == "nodes")
@@ -314,8 +326,19 @@ public:
                                 {
                                   try
                                   {
-                                    root_ptr->pmap[0]->insertNew(cmd[2], cmd[3]);
-                                    std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                    bool done = false;
+                                    auto vec = find_nodes(hash(cmd[2]));
+                                    for (int i = 0; i < vec.size(); i++) {
+                                      if (vec[i] == my_addr) {
+                                        root_ptr->pmap[i]->insertNew(cmd[2], cmd[3]);
+                                        std::cout << "[MAP] Inserted element in map=" << i <<" with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                        done = true;
+                                      }
+                                    }
+                                    if(!done) {
+                                      nodes_map[vec[0]]._session->insert(cmd[2], cmd[3]);
+                                    }                                    
+                                    
                                     write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
                                   }
                                   catch (...)
@@ -328,9 +351,21 @@ public:
                                 {
                                   try
                                   {
-                                    std::string value = root_ptr->pmap[0]->remove(cmd[2]);
+                                    bool done = false;
+                                    auto vec = find_nodes(hash(cmd[2]));
+                                    for (int i = 0; i < vec.size(); i++) {
+                                      if (vec[i] == my_addr) {
+                                        auto value = root_ptr->pmap[i]->remove(cmd[2]);
+                                        std::cout << "[MAP] Removed element in map=" << i <<" with key=" << cmd[2] << std::endl;
+                                        write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                        done = true;
+                                      }
+                                    }
+                                    if (!done) {
+                                      nodes_map[vec[0]]._session->remove(cmd[2]);
+                                    }
                                     //std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
-                                    write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                    
                                   }
                                   catch (...)
                                   {
