@@ -93,7 +93,7 @@
 
 \renewcommand{\maketitlehooka}{%
 \begin{center}
-Poznan University of Technology\\Faculty of Computer Science\\Institute of Computer Science
+Poznan University of Technology\\Faculty of Computing Science\\Institute of Computing Science
 \end{center}}
 
 \pretitle{\vspace{2cm}\begin{center}%
@@ -129,7 +129,7 @@ Supervisors\\\@ppsupervisor
 \vglue 0pt\copyright{} \@ppyear\ \@author
 
 \medskip\noindent%
-Poznan University of Technology\\Faculty of Computer Science\\Institute of Computer Science
+Poznan University of Technology\\Faculty of Computing Science\\Institute of Computing Science
 
 \medskip\noindent%
 % \if@pppolish%
