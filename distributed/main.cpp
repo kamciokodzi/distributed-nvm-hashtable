@@ -282,9 +282,15 @@ public:
                                   
                                   Iterator<std::string, std::string> it(root_ptr->pmap[0]);
                                   try {
-                                    auto element = it.get();
+                                    auto key = it.getKey();
+                                    auto value = it.getValue();
+
+                                    insert(key, value);
+
                                     while (it.next()) {
-                                      element = it.get();
+                                      key = it.getKey();
+                                      value = it.getValue();
+                                      insert(key, value);
                                     }
                                   } 
                                   catch(...) {
@@ -633,7 +639,7 @@ void *keyboard(void *arg)
       Iterator<std::string, std::string> it(root_ptr->pmap[0]);
       try
       {
-        std::cout << "[MAP] " << it.get() << " ";
+        std::cout << "[MAP] " << it.getValue() << " ";
       }
       catch (...)
       {
@@ -643,7 +649,7 @@ void *keyboard(void *arg)
       {
         try
         {
-          std::cout << it.get() << " ";
+          std::cout << it.getValue() << " ";
         }
         catch (...)
         {
