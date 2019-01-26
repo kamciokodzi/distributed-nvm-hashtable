@@ -352,7 +352,7 @@ public:
 	return currentSegmentObject->value.get_ro();
     }
 
-    V getKey() {
+    K getKey() {
         return currentSegmentObject->key.get_ro();
     }
 
