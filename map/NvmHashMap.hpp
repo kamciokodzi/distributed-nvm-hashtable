@@ -111,15 +111,15 @@ private:
 
     int32_t hash(K keyString) {
         int64_t key = typeToInteger(keyString);
-        int32_t num_buckets = 10000000;
+        int32_t range = 1000000;
         int64_t b = 1;
         int64_t j = 0;
-        while (j < num_buckets) {
+        for(int i = 0; i < 5; i++) {
             b = j;
-            key = key * 2862933555777941757ULL + 1;
+            key = key * 2862933555777941757ULL + j;
             j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
         }
-        return fabs(b);
+        return fabs(b % range);
     }
 
     NvmHashMap<K, V> *getPtr() {
