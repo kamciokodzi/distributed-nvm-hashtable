@@ -355,8 +355,12 @@ public:
 	}
     }
 
-    V get() {
+    V getValue() {
 	return currentSegmentObject->value.get_ro();
+    }
+
+    V getKey() {
+        return currentSegmentObject->key.get_ro();
     }
 
     bool next() {
