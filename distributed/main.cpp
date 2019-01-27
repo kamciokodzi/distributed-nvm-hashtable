@@ -21,6 +21,7 @@ struct root
 };
 
 pmem::obj::persistent_ptr<root> root_ptr;
+pmem::obj::pool<root> pop;
 
 bool file_exists(const char *fname)
 {
@@ -87,13 +88,12 @@ int32_t hash(uint64_t key, int32_t num_buckets = 360)
 {
   int64_t b = 1;
   int64_t j = 0;
-  while (j < num_buckets)
-  {
+  for(int i = 0; i < 5; i++) {
     b = j;
-    key = key * 2862933555777941757ULL + 1;
+    key = key * 2862933555777941757ULL + j;
     j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
   }
-  return b;
+  return fabs(b % num_buckets);
 }
 int32_t hash(std::string arg, int32_t num_buckets = 360)
 {
@@ -106,13 +106,12 @@ int32_t hash(std::string arg, int32_t num_buckets = 360)
 
   int64_t b = 1;
   int64_t j = 0;
-  while (j < num_buckets)
-  {
+  for(int i = 0; i < 5; i++) {
     b = j;
-    key = key * 2862933555777941757ULL + 1;
+    key = key * 2862933555777941757ULL + j;
     j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
   }
-  return b;
+  return fabs(b % num_buckets);
 }
 
 std::unordered_map<std::string, node> nodes_map;
@@ -187,6 +186,44 @@ std::vector<std::string> find_nodes(int32_t hash)
   return result_vec;
 }
 
+std::vector<std::string> find_nodes_back(int32_t hash)
+{
+  std::vector<std::string> result_vec;
+  std::shared_lock lock(nodes_mutex);
+
+  int count = std::min(REPLICATION_FACTOR, (int)nodes_map.size());
+
+  for (int i = 0; i < count; i++)
+  {
+    std::string result;
+    int32_t temp = -1;
+    std::string max_result;
+    int32_t max = -1;
+
+    for (const auto &[key, value] : nodes_map)
+    {
+      if (value.hash <= hash && value.hash > temp && (std::find(result_vec.begin(), result_vec.end(), key) == result_vec.end()))
+      {
+        temp = value.hash;
+        result = key;
+      }
+      if (value.hash > max && (std::find(result_vec.begin(), result_vec.end(), key) == result_vec.end()))
+      {
+        max = value.hash;
+        max_result = key;
+      }
+    }
+
+    if (temp == -1)
+    {
+      result = max_result;
+    }
+
+    result_vec.push_back(result);
+  }
+  return result_vec;
+}
+
 std::string serialize(std::vector<std::string> vec, char split = '_')
 {
   std::string result = "";
@@ -254,7 +291,14 @@ public:
   void connect(std::string addr, std::string port)
   {
     tcp::resolver resolver(io_context);
-    boost::asio::connect(socket_, resolver.resolve(addr, port));
+    try {
+      boost::asio::connect(socket_, resolver.resolve(addr, port));
+    }
+    catch (...) {
+      std::cout<<"Can't connect to: "<< addr + ":" + port << std::endl;
+      nodes_map[addr + ":" + port]._session = nullptr;
+      return;
+    }
 
     write("connect_" + str_timestamp() + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>() + "_" + std::to_string(nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()].hash));
     node n = node(this, addr, port, ip_hash(addr, port));
@@ -278,40 +322,125 @@ public:
                                   node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0));
                                   std::unique_lock lock(nodes_mutex);
                                   nodes_map[cmd[2] + ":" + cmd[3]] = n;
+                                  lock.unlock();
+                                  std::cout<<serialize(nodes_map)<<std::endl;
                                   write("nodes_" + str_timestamp() + "_" + serialize(nodes_map));
                                   
-                                  Iterator<std::string, std::string> it(root_ptr->pmap[0]);
-                                  try {
-                                    auto key = it.getKey();
-                                    auto value = it.getValue();
+                                  auto vec = find_nodes_back(ip_hash(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>()));
 
-                                    insert(key, value);
-
-                                    while (it.next()) {
-                                      key = it.getKey();
-                                      value = it.getValue();
-                                      insert(key, value);
-                                    }
-                                  } 
-                                  catch(...) {
-
+                                  for (int i = 0; i < vec.size(); i++) {
+                                    std::cout<<"Before: "<<vec[i]<<std::endl;
                                   }
 
-                                  lock.unlock();
+                                  int place = -1;
+
+                                  for (int i = 0; i < vec.size(); i++) {
+                                    if (vec[i] == (cmd[2] + ":" + cmd[3])) {
+                                      place = i;
+                                      std::cout<<"Place: "<<place<<std::endl;
+                                    }
+                                  }
+
+                                  if (place > 0) {
+
+                                    for (int j = vec.size()-1; j > place; j--){
+                                      root_ptr->pmap[j] = root_ptr->pmap[j-1];
+                                    }
+                                    pmem::obj::transaction::run(pop, [&] {
+                                      std::cout << "[MAP] Creating NvmHashMap" << std::endl;
+                                      root_ptr->pmap[place] = pmem::obj::make_persistent<NvmHashMap<std::string, std::string>>(8);
+                                    });
+
+                                    if (vec[1] == (cmd[2] + ":" + cmd[3])) {
+                                      std::cout<<"Send part of my items"<<std::endl;
+                                      Iterator<std::string, std::string> it(root_ptr->pmap[0]);
+                                      try {
+                                        std::string key;
+                                        std::string value;
+
+                                        while (it.next()) {
+                                          key = it.getKey();
+                                          std::cout<<find_nodes(hash(key))[0]<<std::endl;
+                                          if (find_nodes(hash(key))[0] == (cmd[2] + ":" + cmd[3])) {
+                                            value = it.getValue();
+                                            std::cout<<key<<std::endl;
+                                            insert(key, value);
+                                            root_ptr->pmap[0]->remove(key);
+                                          }
+                                        }
+                                      } 
+                                      catch(...) {
+                                        std::cout<<"Error"<<std::endl;
+                                      }
+                                    }
+                                  }
+                                  else {
+                                    vec = find_nodes(ip_hash(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>()));
+
+                                    for (int i = 0; i < vec.size(); i++) {
+                                      if (vec[i] == (cmd[2] + ":" + cmd[3])) {
+                                        std::cout<<"Send my items to replicate"<<std::endl;
+                                        Iterator<std::string, std::string> it(root_ptr->pmap[0]);
+                                        try {
+                                          std::string key;
+                                          std::string value;
+
+                                          while (it.next()) {
+                                            key = it.getKey();
+                                            std::cout<<key<<std::endl;
+                                            value = it.getValue();
+                                            insert(key, value);
+                                          }
+                                        } 
+                                        catch(...) {
+                                        }
+                                      }
+                                    } 
+                                  }                                                                   
                                 }
                                 else if (cmd[0] == "nodes")
                                 {
                                   std::cout << "Get nodes: " << data_ << std::endl;
                                   std::unique_lock lock(nodes_mutex);
+                                  bool last = true;
                                   for (int i = 2; i < cmd.size(); i += 2)
                                   {
                                     if (nodes_map.find(cmd[i] + ":" + cmd[i + 1]) == nodes_map.end())
                                     {
-                                      tcp::socket sock(io_context);
-                                      std::make_shared<session>(std::move(sock))->connect(cmd[i], cmd[i + 1]);
+                                      last = false;
+                                      try {
+                                        tcp::socket sock(io_context);
+                                        std::make_shared<session>(std::move(sock))->connect(cmd[i], cmd[i + 1]);
+                                      }
+                                      catch (...) {
+                                        
+                                      }
+                                    }
+                                  }                                  
+                                  lock.unlock();
+                                  if (last) {
+                                    auto vec = find_nodes(ip_hash(vm["my_addr"].as<std::string>(), vm["port"].as<std::string>()));
+
+                                    std::cout<<"Send my items to replicate"<<std::endl;
+                                    Iterator<std::string, std::string> it(root_ptr->pmap[0]);
+                                    try {
+                                      std::string key;
+                                      std::string value;
+
+                                      while (it.next()) {
+                                        key = it.getKey();
+                                        std::cout<<key<<std::endl;
+                                        value = it.getValue();
+                                        for (int i = 1; i < vec.size(); i++) {
+                                          std::shared_lock lock(nodes_mutex);
+                                          nodes_map[vec[i]]._session->insert(key, value);
+                                          lock.unlock();
+                                        }                                        
+                                      }
+                                    } 
+                                    catch(...) {
                                     }
                                   }
-                                  lock.unlock();
                                 }
 
                                 else if (cmd[0] == "get")
@@ -435,7 +564,7 @@ public:
   void write(std::string msg)
   {
     auto self(shared_from_this());
-    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()),
+    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()+1),
                              [this, self](boost::system::error_code ec, std::size_t /*length*/) {
                                if (ec)
                                {
@@ -547,8 +676,8 @@ void *keyboard(void *arg)
             else
             {
               std::cout << "local" << std::endl;
-              root_ptr->pmap[0]->insertNew(cmd[1], cmd[2]);
-              std::cout << "[MAP] Inserted element with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
+              root_ptr->pmap[i]->insertNew(cmd[1], cmd[2]);
+              std::cout << "[MAP] Inserted element in map=" << i <<" with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
             }
           }
         }
@@ -621,7 +750,7 @@ void *keyboard(void *arg)
             else
             {
               std::cout << "local" << std::endl;
-              std::string value = root_ptr->pmap[0]->remove(cmd[1]);
+              std::string value = root_ptr->pmap[i]->remove(cmd[1]);
               std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
             }
           }
@@ -637,19 +766,12 @@ void *keyboard(void *arg)
     {
 
       Iterator<std::string, std::string> it(root_ptr->pmap[0]);
-      try
-      {
-        std::cout << "[MAP] " << it.getValue() << " ";
-      }
-      catch (...)
-      {
-      }
 
       while (it.next())
       {
         try
         {
-          std::cout << it.getValue() << " ";
+          std::cout << it.getKey() << " " << it.getValue() << " ";
         }
         catch (...)
         {
@@ -675,7 +797,7 @@ int main(int argc, char *argv[])
 
   my_addr = vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>();
 
-  pmem::obj::pool<root> pop;
+  
   std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
   try
