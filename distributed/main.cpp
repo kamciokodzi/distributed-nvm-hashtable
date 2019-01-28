@@ -35,7 +35,7 @@ bool file_exists(const char *fname)
   }
   return false;
 }
-const int32_t range = 1000;
+const int32_t range = 360;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
@@ -109,13 +109,13 @@ int32_t hash(std::string arg, int32_t num_buckets = 10)
 
   int64_t b = 1;
   int64_t j = 0;
-  for (int i = 0; i < 5; i++)
+  while (j < num_buckets)
   {
     b = j;
-    key = key * 2862933555777941757ULL + j;
+    key = key * 2862933555777941757ULL + 1;
     j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
   }
-  return fabs(b % num_buckets);
+  return b;
 }
 
 std::unordered_map<std::string, node> nodes_map;
