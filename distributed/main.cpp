@@ -1040,7 +1040,7 @@ int main(int argc, char *argv[])
     {
       std::cout << "[MAP] File doesn't exists, creating pool" << std::endl;
       pop = pmem::obj::pool<root>::create(path, "",
-                                          PMEMOBJ_MIN_POOL * 4, 0777);
+                                          PMEMOBJ_MIN_POOL * 63, 0777);
 
       root_ptr = pop.root();
 
