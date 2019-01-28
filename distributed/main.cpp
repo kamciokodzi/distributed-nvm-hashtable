@@ -704,7 +704,7 @@ void insert(std::string key, std::string value, bool last = false) {
         if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
         {
           //std::cout << location << std::endl;
-          std::shared_lock lock(nodes_mutex);
+          std::unique_lock lock(nodes_mutex);
           if (last) {
             nodes_map[location]._session->insert(key, value, true);
           } else {
@@ -735,7 +735,7 @@ void get(std::string key, bool last = false) {
       if (location != my_addr)
       {
         //std::cout << location << std::endl;
-        std::shared_lock lock(nodes_mutex);
+        std::unique_lock lock(nodes_mutex);
         if (last) {
           nodes_map[location]._session->get(key, true);
         } else {
