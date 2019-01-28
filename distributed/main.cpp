@@ -710,7 +710,7 @@ private:
 void insert(std::string key, std::string value, bool last = false) {
   try
     {
-      std::cout<<key<<std::endl;
+      // std::cout<<key<<std::endl;
 
       auto vec = find_nodes(hash(key));
       for (int i = 0; i < vec.size(); i++)
