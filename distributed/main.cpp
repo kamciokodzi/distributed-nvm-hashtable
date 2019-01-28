@@ -35,7 +35,7 @@ bool file_exists(const char *fname)
   }
   return false;
 }
-const int32_t range = 10;
+const int32_t range = 20;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
@@ -542,7 +542,12 @@ public:
                                       {
                                         auto value = root_ptr->pmap[i]->remove(cmd[2]);
                                         //std::cout << "[MAP] Removed element in map=" << i << " with key=" << cmd[2] << std::endl;
-                                        write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                        
+                                        if (cmd.size() >= 5) {
+                                          write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value + "_last");
+                                        } else {
+                                          write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                        } 
                                         done = true;
                                       }
                                     }
@@ -591,6 +596,13 @@ public:
                                 else if (cmd[0] == "removeResult")
                                 {
                                   std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  if (cmd.size() >= 5) {
+                                    if (cmd[4] == "last") {
+                                      auto end = std::chrono::system_clock::now();
+                                      std::chrono::duration<double> elapsed_time = end-start_time;
+                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl; 
+                                    }
+                                  }
                                 }
                                 else if (cmd[0] == "removeResultBad")
                                 {
@@ -655,6 +667,10 @@ public:
   void remove(std::string key)
   {
     write("remove_" + str_timestamp() + "_" + key);
+  }
+  void remove(std::string key, bool last)
+  {
+    write("remove_" + str_timestamp() + "_" + key + "_last");
   }
 
   tcp::socket socket_;
@@ -725,6 +741,38 @@ void insert(std::string key, std::string value, bool last = false) {
       std::cout << "[MAP] Element not found" << std::endl;
     }
 }
+void remove(std::string key, bool last = false) {
+  try
+    {
+      auto vec = find_nodes(hash(key));
+      for (int i = 0; i < vec.size(); i++)
+      {
+        std::string location = vec[i];
+        std::cout << "Server: ";
+        if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+        {
+          std::cout << location << std::endl;
+          std::unique_lock lock(nodes_mutex);
+          if (last) {
+            nodes_map[location]._session->remove(key, true);
+          } else {
+            nodes_map[location]._session->remove(key);
+          }
+          lock.unlock();
+        }
+        else
+        {
+          std::cout << "local" << std::endl;
+          std::string value = root_ptr->pmap[i]->remove(key);
+          std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
+        }
+      }
+    }
+    catch (...)
+    {
+      std::cout << "[MAP] Element not found" << std::endl;
+    }
+}
 void get(std::string key, bool last = false) {
   try
     {
@@ -739,6 +787,7 @@ void get(std::string key, bool last = false) {
         if (last) {
           nodes_map[location]._session->get(key, true);
         } else {
+          std::cout<<"Get: "<<key<<std::endl;
           nodes_map[location]._session->get(key);
         }
         lock.unlock();
@@ -795,6 +844,23 @@ void *keyboard(void *arg)
           get(std::to_string(i));
         }
         get(std::to_string(l), true);
+
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end-start_time;
+        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+      }
+      if (cmd[1] == "remove") 
+      {
+        int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
+        int s = std::stoi(cmd[2]);
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+
+        start_time = std::chrono::system_clock::now();
+
+        for (int i = s; i < l; i++) {
+          remove(std::to_string(i));
+        }
+        remove(std::to_string(l), true);
 
         auto end = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_time = end-start_time;
