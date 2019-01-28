@@ -1032,7 +1032,7 @@ int main(int argc, char *argv[])
 
   my_addr = vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>();
 
-  std::string path = "hashmapFile" + vm["port"].as<std::string>();
+  std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
 
   try
   {
@@ -1040,7 +1040,7 @@ int main(int argc, char *argv[])
     {
       std::cout << "[MAP] File doesn't exists, creating pool" << std::endl;
       pop = pmem::obj::pool<root>::create(path, "",
-                                          PMEMOBJ_MIN_POOL * 100, 0777);
+                                          PMEMOBJ_MIN_POOL * 4, 0777);
 
       root_ptr = pop.root();
 
