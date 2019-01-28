@@ -319,7 +319,7 @@ public:
                             [this, self](boost::system::error_code ec, std::size_t length) {
                               if (!ec)
                               {
-                                                                  std::cout<<data_<<std::endl;
+                                                                  // std::cout<<data_<<std::endl;
 
                                 std::vector<std::string> cmd = deserialize(std::string(data_));
                                 if (cmd[0] == "connect")
@@ -595,7 +595,7 @@ public:
                                 }
                                 else if (cmd[0] == "removeResult")
                                 {
-                                  std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  // std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
                                   if (cmd.size() >= 5) {
                                     if (cmd[4] == "last") {
                                       auto end = std::chrono::system_clock::now();
@@ -748,10 +748,10 @@ void remove(std::string key, bool last = false) {
       for (int i = 0; i < vec.size(); i++)
       {
         std::string location = vec[i];
-        std::cout << "Server: ";
+        // std::cout << "Server: ";
         if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
         {
-          std::cout << location << std::endl;
+          // std::cout << location << std::endl;
           std::unique_lock lock(nodes_mutex);
           if (last) {
             nodes_map[location]._session->remove(key, true);
@@ -762,9 +762,9 @@ void remove(std::string key, bool last = false) {
         }
         else
         {
-          std::cout << "local" << std::endl;
+          // std::cout << "local" << std::endl;
           std::string value = root_ptr->pmap[i]->remove(key);
-          std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
+          // std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
         }
       }
     }
