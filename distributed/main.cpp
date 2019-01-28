@@ -13,7 +13,9 @@
 #include <shared_mutex>
 #include "../map/NvmHashMap.hpp"
 
-#define REPLICATION_FACTOR 3
+#define REPLICATION_FACTOR 1
+
+auto start_time = std::chrono::system_clock::now();
 
 struct root
 {
@@ -33,7 +35,7 @@ bool file_exists(const char *fname)
   }
   return false;
 }
-const int32_t range = 360;
+const int32_t range = 10;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
@@ -84,7 +86,7 @@ public:
   }
 };
 
-int32_t hash(uint64_t key, int32_t num_buckets = 360)
+int32_t hash(uint64_t key, int32_t num_buckets = 10)
 {
   int64_t b = 1;
   int64_t j = 0;
@@ -96,7 +98,7 @@ int32_t hash(uint64_t key, int32_t num_buckets = 360)
   }
   return fabs(b % num_buckets);
 }
-int32_t hash(std::string arg, int32_t num_buckets = 360)
+int32_t hash(std::string arg, int32_t num_buckets = 10)
 {
 
   uint64_t key = 0;
@@ -317,6 +319,8 @@ public:
                             [this, self](boost::system::error_code ec, std::size_t length) {
                               if (!ec)
                               {
+                                                                  std::cout<<data_<<std::endl;
+
                                 std::vector<std::string> cmd = deserialize(std::string(data_));
                                 if (cmd[0] == "connect")
                                 {
@@ -475,12 +479,20 @@ public:
                                   {
                                     std::string value = root_ptr->pmap[0]->get(cmd[2]);
                                     //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << value << std::endl;
-                                    write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                    if (cmd.size() >= 4) {
+                                      write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value + "_last");
+                                    } else {
+                                      write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
+                                    }
                                   }
                                   catch (...)
                                   {
                                     //std::cout << "[MAP] Element not found" << std::endl;
-                                    write("getResultBad_" + str_timestamp() + "_" + cmd[2]);
+                                    if (cmd.size() >= 4) {
+                                      write("getResultBad_" + str_timestamp() + "_" + cmd[2] + "_last");
+                                    } else {
+                                      write("getResultBad_" + str_timestamp() + "_" + cmd[2]);
+                                    }
                                   }
                                 }
                                 else if (cmd[0] == "insert")
@@ -494,7 +506,7 @@ public:
                                       if (vec[i] == my_addr)
                                       {
                                         root_ptr->pmap[i]->insertNew(cmd[2], cmd[3]);
-                                        std::cout << "[MAP] Inserted element in map=" << i << " with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                        //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
                                         done = true;
                                       }
                                     }
@@ -502,13 +514,20 @@ public:
                                     {
                                       nodes_map[vec[0]]._session->insert(cmd[2], cmd[3]);
                                     }
-
-                                    write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
+                                    if (cmd.size() >= 5) {
+                                      write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
+                                    } else {
+                                      write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
+                                    }                                    
                                   }
                                   catch (...)
                                   {
-                                    //std::cout << "[MAP] Element not found" << std::endl;
-                                    write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
+                                    std::cout << "[MAP] Element not found" << std::endl;
+                                    if (cmd.size() >= 5) {
+                                      write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
+                                    } else {
+                                      write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
+                                    }                                     
                                   }
                                 }
                                 else if (cmd[0] == "remove")
@@ -522,7 +541,7 @@ public:
                                       if (vec[i] == my_addr)
                                       {
                                         auto value = root_ptr->pmap[i]->remove(cmd[2]);
-                                        std::cout << "[MAP] Removed element in map=" << i << " with key=" << cmd[2] << std::endl;
+                                        //std::cout << "[MAP] Removed element in map=" << i << " with key=" << cmd[2] << std::endl;
                                         write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
                                         done = true;
                                       }
@@ -535,13 +554,20 @@ public:
                                   }
                                   catch (...)
                                   {
-                                    //std::cout << "[MAP] Element not found" << std::endl;
+                                    std::cout << "[MAP] Element not found" << std::endl;
                                     write("removeResultBad_" + str_timestamp() + "_" + cmd[2]);
                                   }
                                 }
                                 else if (cmd[0] == "getResult")
                                 {
-                                  std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  if (cmd.size() >= 5) {
+                                    if (cmd[4] == "last") {
+                                      auto end = std::chrono::system_clock::now();
+                                      std::chrono::duration<double> elapsed_time = end-start_time;
+                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl;
+                                    }
+                                  }
                                 }
                                 else if (cmd[0] == "getResultBad")
                                 {
@@ -549,7 +575,14 @@ public:
                                 }
                                 else if (cmd[0] == "insertResult")
                                 {
-                                  std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  //std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
+                                  if (cmd.size() >= 5) {
+                                    if (cmd[4] == "last") {
+                                      auto end = std::chrono::system_clock::now();
+                                      std::chrono::duration<double> elapsed_time = end-start_time;
+                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl; 
+                                    }
+                                  }
                                 }
                                 else if (cmd[0] == "insertResultBad")
                                 {
@@ -607,9 +640,17 @@ public:
   {
     write("get_" + str_timestamp() + "_" + key);
   }
+  void get(std::string key, bool last)
+  {
+    write("get_" + str_timestamp() + "_" + key + "_last");
+  }
   void insert(std::string key, std::string value)
   {
     write("insert_" + str_timestamp() + "_" + key + "_" + value);
+  }
+  void insert(std::string key, std::string value, bool last)
+  {
+    write("insert_" + str_timestamp() + "_" + key + "_" + value + "_last");
   }
   void remove(std::string key)
   {
@@ -650,6 +691,71 @@ private:
   tcp::acceptor acceptor_;
 };
 
+void insert(std::string key, std::string value, bool last = false) {
+  try
+    {
+      std::cout<<key<<std::endl;
+
+      auto vec = find_nodes(hash(key));
+      for (int i = 0; i < vec.size(); i++)
+      {
+        std::string location = vec[i];
+        //std::cout << "Server: ";
+        if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+        {
+          //std::cout << location << std::endl;
+          std::shared_lock lock(nodes_mutex);
+          if (last) {
+            nodes_map[location]._session->insert(key, value, true);
+          } else {
+            nodes_map[location]._session->insert(key, value);
+          }
+          lock.unlock();
+        }
+        else
+        {
+          //std::cout << "local" << std::endl;
+          root_ptr->pmap[i]->insertNew(key, value);
+          //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << key << " and value=" << value << std::endl;
+        }
+      }
+    }
+    catch (...)
+    {
+      std::cout << "[MAP] Element not found" << std::endl;
+    }
+}
+void get(std::string key, bool last = false) {
+  try
+    {
+      auto vec = find_nodes(hash(key));
+
+      std::string location = vec[0];
+      //std::cout << "Server: ";
+      if (location != my_addr)
+      {
+        //std::cout << location << std::endl;
+        std::shared_lock lock(nodes_mutex);
+        if (last) {
+          nodes_map[location]._session->get(key, true);
+        } else {
+          nodes_map[location]._session->get(key);
+        }
+        lock.unlock();
+      }
+      else
+      {
+        //std::cout << "local" << std::endl;
+        std::string value = root_ptr->pmap[0]->get(key);
+        //std::cout << "[MAP] Found element with key=" << key << " and value=" << value << std::endl;
+      }
+    }
+    catch (...)
+    {
+      std::cout << "[MAP] Element not found" << std::endl;
+    }
+}
+
 void *keyboard(void *arg)
 {
   std::string command;
@@ -658,13 +764,42 @@ void *keyboard(void *arg)
     std::getline(std::cin, command);
     std::vector<std::string> cmd = deserialize(command, ' ');
 
-    if (cmd[0] == "test" && cmd.size() >= 3)
+    if (cmd[0] == "test" && cmd.size() >= 4)
     {
-      std::cout << "test on " << cmd[1] << ":" << cmd[2] << std::endl;
+      if (cmd[1] == "insert") 
+      {
+        int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
+        int s = std::stoi(cmd[2]);
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
 
-      std::shared_lock lock(nodes_mutex);
-      nodes_map[cmd[1] + ":" + cmd[2]]._session->write("test");
-      lock.unlock();
+        start_time = std::chrono::system_clock::now();
+
+        for (int i = s; i < l; i++) {
+          insert(std::to_string(i), std::to_string(i));
+        }
+        insert(std::to_string(l), std::to_string(l), true);
+
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end-start_time;
+        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+      }
+      else if (cmd[1] == "get") 
+      {
+        int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
+        int s = std::stoi(cmd[2]);
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+
+        start_time = std::chrono::system_clock::now();
+
+        for (int i = s; i < l; i++) {
+          get(std::to_string(i));
+        }
+        get(std::to_string(l), true);
+
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end-start_time;
+        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+      } 
     }
 
     else if (cmd[0] == "sleep" && cmd.size() >= 3)
@@ -691,6 +826,7 @@ void *keyboard(void *arg)
       }
       else
       {
+        //insert(cmd[1], cmd[2]);
         try
         {
           auto vec = find_nodes(hash(cmd[1]));
