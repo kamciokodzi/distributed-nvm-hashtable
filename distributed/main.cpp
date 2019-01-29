@@ -823,7 +823,7 @@ void *keyboard(void *arg)
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c {
+        for (int i = s; i < l; i+=c) {
           insert(std::to_string(i), std::to_string(i));
         }
         insert(std::to_string(l), std::to_string(l), true);
@@ -841,7 +841,7 @@ void *keyboard(void *arg)
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c {
+        for (int i = s; i < l; i+=c) {
           get(std::to_string(i));
         }
         get(std::to_string(l), true);
