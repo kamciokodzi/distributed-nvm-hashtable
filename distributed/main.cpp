@@ -98,7 +98,7 @@ int32_t hash(uint64_t key, int32_t num_buckets = 10)
   }
   return fabs(b % num_buckets);
 }
-int32_t hash(std::string arg, int32_t num_buckets = 10)
+int32_t hash(std::string arg, int32_t num_buckets = range)
 {
 
   uint64_t key = 0;
@@ -109,13 +109,13 @@ int32_t hash(std::string arg, int32_t num_buckets = 10)
 
   int64_t b = 1;
   int64_t j = 0;
-  while (j < num_buckets)
+  for (int i = 0; i < 5; i++)
   {
     b = j;
-    key = key * 2862933555777941757ULL + 1;
+    key = key * 2862933555777941757ULL + j;
     j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
   }
-  return b;
+  return fabs(b % num_buckets);
 }
 
 std::unordered_map<std::string, node> nodes_map;
