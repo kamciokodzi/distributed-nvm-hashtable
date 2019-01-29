@@ -35,7 +35,7 @@ bool file_exists(const char *fname)
   }
   return false;
 }
-const int32_t range = 360;
+const int32_t range = 80;
 
 using boost::asio::ip::tcp;
 namespace bpo = boost::program_options;
