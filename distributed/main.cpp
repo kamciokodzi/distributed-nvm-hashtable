@@ -13,7 +13,7 @@
 #include <shared_mutex>
 #include "../map/NvmHashMap.hpp"
 
-#define REPLICATION_FACTOR 3
+#define REPLICATION_FACTOR 1
 
 auto start_time = std::chrono::system_clock::now();
 
