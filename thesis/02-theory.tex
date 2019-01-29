@@ -1,38 +1,66 @@
-\chapter{Background}
+\chapter{Background} \label{Background}
 
 In this chapter we will discuss concepts and technologies used to develop our system.
 
 \section{Non-Volatile Memory and Persistent Memory}
     
-    \subsection{Definitions}
-        \NVM (NVM) is a class of memory storage devices which are able to keep data after power outage.
-        There are two main categories of NVM: electrically addressed and mechanically addressed.\\
-        \PM (PM) is a directly byte-addressable, non-volatile memory which can be accessed by the memory bus. %kn "via" the memory bus?
+    %\tk{NVM - briefly what it is, and what is it good for; a paragraph about the history of NVM -- where did it come from, how it evolved, what is the current status (e.g. one can buy some hardware but it is still relatively slow and expensive, drivers are available; what are the most popular technologies within the NVM-world?; is NVM the same as PM?}
     
+    \subsection{Definitions}
+    \tk{This might be misleading. Let's call NVM only the new technology, not just any computer storage.}
+        \NVM (NVM) is a class of memory storage devices which are able to keep data after power outage. Consequently, they are suitable for systems which rely on data durability, such as database systems.
+        In fact, NVM is one of the crucial components of most computers, as the most popular data storages: HDD and SSD drives are part of NVM family.
+        A noticable drawback of this type of memory is a fact that it is much slower than their volatile counterparts. 
+        Currently high-performance NVM solution is expensive and offers low capacity while still having a significant lack of performance in comparison to DRAM memory. 
+        The performance of NVM, however, is still improving and the gap between NVM and DRAM is expected to be insignificant in the future. 
+        
+        \PM (PM) is a directly byte-addressable, non-volatile memory which can be accessed via the memory bus.
+        
     \subsection{Access to NVM \cite{PmemAccess}}
+        \tk{Correct me if I'm wrong, but it seems to me that at least Intel uses the same technology to created PM as well as for a new kind of SSDs, which are treated by the operating system as block devices (Intel Optane?).}
+    
         In most computer applications access to data storage proceeds as follows:
         \begin{itemize}
-            \item Application uses the file system API to access the files
-            \item File system performs read and write operations through a driver
-            \item All data transferred during those operations is composed of blocks, typically of size 4KB
+            \item Application uses the file system API to access the files.
+            \item File system performs read and write operations through a driver.
+            \item All data transferred during those operations is composed of blocks, typically of size 4KB.
         \end{itemize}
-        Solution described above is inadequate from the point of view of PM, because it makes programmers unable to use its byte-addressability. % from the PM point of view - nie lepiej?
-        To solve this problem method called \DAX (DAX) was created.
+        The solution described above is inadequate from the point of view of PM, because it makes programmers unable to utilize low latency byte-addressable direct access supported by the hardware.
+        To solve this issue the support for \DAX (DAX) was incorporated into operating systems.
         In this approach persistent memory-aware file system is used to map virtual addresses to physical addresses in PM. 
-        It allows applications to access directly to individual bytes of the storage.
+        It allows applications to directly access individual bytes of the storage without the necessity to operate on entire blocks. The processes attach a region of mapped persistent memory to their address space and simply use it as an ordinary operating memory  segment.
       
-    \subsection{Emulation \cite{PmemEmulation}}
+    \subsection{Emulation}
+        %\tk{What is emulation, what is it for? When it can be use, as opposed1 to what?}
+        Persistent memory is not easily available and during this project we were not able to use it. 
+        To examine its features in an application it is possible to emulate it by marking 
+        using a file system with DAX support, by marking ordinary RAM segments as PM.\cite{PmemEmulation}
+        % Alternatively, a regular shared memory segment can be used for emulation
         Emulation of the \PM is not obligatory during the development of the project, however, it is required to achieve a sufficient performance of the final product. 
         Emulation is based on DRAM memory, which is recognized by operating system as persistent memory region.
         \PM emulated in such way will not keep data after power outage, but it will provide performance comparable with hardware solution.
+        %kn: what about the files which we use to emulate PM?
         
-    \subsection{Programming for NVM}
+    \subsection{Developing applications for NVM}
+        %\tk{Maybe something like: developing applications for NVM or NVM-enables applications?}
+        
+        \tk{This subsection requires more details. Why do we get corrupted or incomplete data? Why a mutex won't be released? Because after a crash, the state of processes/threads is not restored. Processes operate in RAM, cache and processor registers, the contents all of which can be lost event though NVM is used. }
+    
         Programming for persistent memory differs from programming for volatile memory. 
         In case of this project there are two most important differences that should be considered.
         
         Firstly, persistent memory is not reinitialized after the application restart. 
         It implies that corrupted or incomplete data is kept in data structure and may cause incorrect functioning of the program or crashes. 
-        To prevent such situations transactions or similar mechanism must be provided.
+        To prevent such situations mechanism similar to ACID transactions offered by database management systems should be provided. \tk{NVM does not require ACID! only atomicity}
+        It needs to guarantee:
+        \label{ACID}
+        \begin{itemize}
+            \item Atomicity - Either all operations in transaction will be performed or none of them. 
+            \item Consistency - If a system is consistent at the beginning of the transaction, it has to be consistent at the end of the transaction.
+            \item Isolation - Changes made during the transaction will not be visible to other users until the transaction will be committed.
+            \item Durability - Committed transactions cannot be recalled.
+        \end{itemize}
+        %\tk{Too concise. What transactions? What do they need to guarantee?}
         
         Second problem is a synchronisation mechanism. 
         Using mutexes in persistent memory may cause unintended behaviour. 
@@ -42,19 +70,24 @@ In this chapter we will discuss concepts and technologies used to develop our sy
 
     \subsection{Overview}
         Persistent Memory Development Kit (PMDK) \cite{PmemIo} is a set of libraries developed by Intel Corporation, which aim is to support persistent memory programming. 
-        It is based on memory-mapped files (POSIX mmap() system call). 
+        It is based on memory-mapped files (POSIX \texttt{mmap} system call). 
         PMDK consists of 10 libraries suitable for various tasks, most important of which are described below. 
-        It also includes examples which demonstrate how to use each of those libraries and their documentation.
+        It also includes examples which demonstrate how to use each of those libraries and their documentation. 
+        Demonstration how to use those libraries will be shown in the next chapter.
         
-    \subsection{Libpmem library}
-        Libpmem library provides a low-level persistent memory API for C language. 
-        It requires developers to handle memory allocation and flushing changes to persistent memory by themselves. 
-        It also does not provide transactions.
-        Other libraries included in PMDK are based on libpmem and call it internally.
+    %    \tk{The mentioned librariees need not to be in separate subsections, just use enumeration. Also use \texttt{the proper font} for libraries' names. Add that you demonstrate how to use those libraries later on.}
     
-    \subsection{Libpmemobj library}
-        Libpmemobj is a high-level persistent memory library providing API for C language.
-        In contrast to libpmem library, it has implementations of some high-level concepts: 
+    \begin{enumerate}
+    
+    \item
+        \texttt{Libpmem} library provides a low-level persistent memory API for C language. 
+        It requires developers to handle memory allocation and flush changes to persistent memory by themselves. 
+        It also does not provide transactions.
+        Other libraries included in PMDK are based on \texttt{libpmem} and call it internally.
+    
+    \item
+        \texttt{Libpmemobj} is a high-level persistent memory library providing API for C language.
+        In contrast to \texttt{libpmem} library, it has implementations of some high-level concepts: 
         \begin{itemize}
             \item Persistent memory management - persistent memory allocation mechanism and persistent memory pointers are provided.
             \item Transactions - memory snapshot is created and can be restored after failure of a transaction block.
@@ -62,29 +95,20 @@ In this chapter we will discuss concepts and technologies used to develop our sy
             \item Data structures - non-transactional doubly-linked list similar to the one implemented in C standard library is provided. 
         \end{itemize}
         
-    \subsection{Libpmemobj++ library}
-        Libpmemobj++ library provides a C++ bindings for libpmemobj.
-        It allows to create object-oriented applications providing API similar to C++ Standard Template Library (STL), including smart pointers and mutexes compatible with STL locks (std::shared\_lock, std::unique\_lock). % dodaj zrodla, chyba juz nawet sa w biblio dla rozdzialu 3go
+    \item
+        \texttt{Libpmemobj++} library provides a C++ bindings for \texttt{libpmemobj}.
+        It allows to create object-oriented applications providing API similar to C++ Standard Template Library (STL), including smart pointers and mutexes compatible with STL locks (std::shared\_lock \cite{SharedLock}, std::unique\_lock \cite{UniqueLock}).
         Unfortunately it does not support polymorphism, so objects stored in persistent memory cannot use this mechanism.
-    
+    \end{enumerate}
 \section{Distributed hash table} % distributed hash table
 
-    This section covers the general concepts of creating a distributed system for the implemented data structure.
+    This section covers the general concepts of creating a distributed system for the implemented data structure. 
 
-    \subsection{Assumptions}
-        The project assumption is to create a distributed system consisting of many nodes working on the same hash map.
-        Each one can operate on the hash map through its read and write operations.
-        The nodes can join or leave the system at any time without any negative consequences for the data integrity.
-        The data shall have high availability, which is one of the most important components of the CAP theorem \cite{CAP}.
-        That means that the client has to get a response regardless of the state of any node in the system.
-        Achieving high availability requires the system to have no downtimes and to be operational all the time.
-        Given the above assumptions, we decided to follow the rules introduced by Amazon in their solution: \Dynamo \cite{AmazonDynamo}.
-    
     \subsection{Amazon Dynamo}
-        Since Amazon is one of the largest e-commerce companies, their services are used by millions of users concurrently. 
-        Their platform consists of tens of thousands of servers and network components located around the world. 
+        As already mentioned in Chapter~\ref{Introduction}, the architecture of \DHTS follows the design principles of \Dynamo. 
+        Since Amazon is one of the largest e-commerce companies, their services are used by millions of users concurrently.
+        Worldwide range of services imply allocating servers and network components around the world.
         In such architecture single units failures are inevitable and have to be taken into account when creating the system.
-        % For such an enterprise even a small system failure could lead to enormous financial consequences and losing customer trust. 
         
         \Dynamo is highly available key-value storage system.
         It is used by some core services of Amazon to provide the "always-on" experience, for example Amazon Simple Storage Service \cite{AmazonS3} also known as Amazon S3.
@@ -109,32 +133,39 @@ In this chapter we will discuss concepts and technologies used to develop our sy
 
     \subsection{Consistent hashing}
         As previously stated, the described system is composed of many nodes. 
-        Their number varies constantly, since the nodes may join and leave the at any time.
+        Their number varies constantly, since the nodes may join and leave the network at any time.
         This requires different approach when distributing the hashtable between the nodes.
         Traditional method causes nearly all keys to be remapped when a new node appears.
-        This would have a catastrophic impact on our system performance since the various elements in the hash table would have to constantly migrate from one node to another.
+        This would significantly decrease our system performance since the various elements in the hash table would have to constantly migrate from one node to another.
         
-        A provided solution is called \textit{consistent hashing}.
+        A provided solution is called \textit{consistent hashing} and is presented on the Figure~\ref{ConsistentHashingImage1}.
         It is a concept based on creating a hash ring and mapping each object to a specified place on the ring. 
         The place is defined by a hashed key of the element.
         The minimal hash ring index corresponds to the \ang{0} angle and the maximum possible index to the \ang{360} angle.
         To assign the hashmap parts to nodes, we have to place both hashmap elements and nodes on the same ring.
-        To find out what keys is a node responsible for, we need to locate the node on the circle by its hash value and move in the ascending angle direction until we find another node. 
-        All objects encountered on this road belongs to this node.
-        Each hashmap object belongs to the node which key is the closest to the object's key in a specified direction (clockwise or counterclockwise). 
-        
-        To be more consistent and distribute keys evenly among nodes, we can assign nodes not to one but to many places.
-        The number of one node keys, known as \textit{weight}, depends on the situation and may be different for each node depending of its capabilities (\textit{heterogeneity}). 
-        Thanks to this solution we can easily add or remove nodes to the system and only $\frac{K}{n}$ keys need to be remapped, where $K$ stands for the number of keys and $n$ for the number of nodes.
+        To find out what keys is a node (f.ex. node \textit{A}) responsible for, we need to locate the node on the circle by its hash value and move in the ascending angle direction until we find another node (in this case node \textit{C}). 
+        All objects encountered on this road belong to the node \textit{A}.
+        Consequently, each hashmap object belongs to the node which key is the closest to the object's key in a specified direction (clockwise or counterclockwise).
         
         \begin{figure}[ht]
             \centering
-                \includegraphics[width=0.45\textwidth]{thesis/figures/hashring.png}  
-                \includegraphics[width=0.45\textwidth]{thesis/figures/vnodes.png}
-            \caption{Hash ring - names represents objects and letters represent nodes. 
-                    Left - nodes represented once at hashring.
-                    Right - nodes with many labels. \cite{ConsistentHashing}}
-        \end{figure} %kn: if you want to include these pictures, i think you should describe them
+            \includegraphics[width=0.55\textwidth]{thesis/figures/hashring.png}  
+            \caption{Hash ring example (letters mark the nodes, names mark the objects \cite{ConsistentHashing}}
+            \label{ConsistentHashingImage1}
+        \end{figure}
+        
+        To be more consistent and distribute keys evenly among nodes, we can assign nodes not to one but to many places on the hash ring (Figure~\ref{ConsistentHashingImage2}).
+        The number of one node keys, known as \textit{weight}, depends on the situation and may be different for each node depending of its capabilities (\textit{heterogeneity}). 
+        Thanks to this solution we can easily add or remove nodes to the system and only $\frac{K}{n}$ keys need to be remapped, where $K$ stands for the number of keys and $n$ for the number of nodes.
+        
+
+        
+        \begin{figure}[ht]
+            \centering
+                \includegraphics[width=0.55\textwidth]{thesis/figures/vnodes.png}
+            \caption{Hash ring example with many node replicas (letters mark the nodes, names mark the objects) \cite{ConsistentHashing}}
+            \label{ConsistentHashingImage2}
+        \end{figure}
         
     \subsection{Replication} 
         Since distributed systems can fail at any time we need to provide an error prone solution.
@@ -145,6 +176,8 @@ In this chapter we will discuss concepts and technologies used to develop our sy
         With existing \textit{hash ring} every node knows about his neighbours.
         Every node has a copy of his local data in the number of neighbouring nodes depending on that factor.
         Thanks to that when one node becomes unavailable, we can still ask another node about data it kept.
+        For that we ask node which is the first replication of unavailable peer.
+        If it doesn't respond too then we move to another replication until we get a response.
         
     \subsection{Used libraries}
         For development purpose we wanted to use the best available solution.
@@ -152,9 +185,19 @@ In this chapter we will discuss concepts and technologies used to develop our sy
         \subsubsection{Seastar}
             \Seastar\cite{Seastar} is an event-driven framework allowing user to write non-blocking, asynchronous code.
             It has support for highly efficient complex server applications on modern multi-core machines.
-            Most known use case of \Seastar is ScyllaDB\cite{ScyllaDB} which achieves higher throughputs and lower latencies than her role model Appache Cassandra\cite{Cassandra}.
+            Most known use case of \Seastar is ScyllaDB\cite{ScyllaDB} which achieves higher throughputs and lower latencies than her role model Apache Cassandra\cite{Cassandra}.
             \Seastar use two concepts of asynchronous programming which are \textit{futures} and \textit{continuations}.
             Multicore machines have usually a huge overhead for sharing data because of that \Seastar use the share-nothing programming model.
+            
+            First version of the project used the \Seastar framework but it caused many problems with development.
+            Building and configuration process provided by authors is incomplete and needs to be redesigned for project purpose.
+            Documentation of \Seastar is missing crucial information and many functions are not described.
+            Tests provided with framework were failing for configuration based on Ubuntu 18.04 LTS.
+            Project then was migrated to Fedora 27 where configuration process was easier and the tests succeeded.
+            \Seastar provides several code samples which we used through reverse engineering to implement a prototype.
+            In the process of combining \textit{Persistent Hash Table} with the \Seastar framework a problem occurred. 
+            The \Seastar framework performed changes of the \texit{hugepages} \cite{Hugepages} during initialization which made PMDK unable to allocate memory.
+            This difficulty was not resolved and the current version of project is not using \Seastar any more.
             
             
         \subsubsection{Boost Asio}
@@ -165,22 +208,3 @@ In this chapter we will discuss concepts and technologies used to develop our sy
                 \item Efficiency - minimise data copying.
                 \item BSD sockets
             \end{itemize}
-
-            \textbf{Difficulties}:
-                For the first glance \Seastar was the perfect choice for our application.
-                Unfortunately we have met many problems with it.
-                First of all whole building and configuring process is incomplete.
-                The biggest problem was that \Seastar is not well known framework and we couldn't find any help on the internet.
-                Nonetheless, after trying different operating systems and Docker we finally managed to get running \Seastar program.
-                Next fact was that tests provided by \Seastar were failing on our machines.
-                We wanted fully operating framework so we had to solve it again.
-                Solution for that was Opera 27 which caused no problems in configuring and running tests.
-                With fully operational \Seastar we started development.
-                Another problem was that documentation of \Seastar covers about 10\% of all functions that they provide.
-                There were some sample codes provided by \Seastar so we used reverse engineering to understand and explore source code.
-                During merging NVM Hash Table application with \Seastar framework we have reached final conflict.
-                \Seastar framework during it's initialization changes the \textit{hugepages}\cite{Hugepages} size which causes \textbf{Segmentation fault} on creating Persisten Memory Object.
-                This difficulty was not resolved and we resigned using \Seastar any more.
-
-
-%TODO Replication factor, seastar lib

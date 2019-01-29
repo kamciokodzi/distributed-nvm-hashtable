@@ -1,64 +1,138 @@
 \chapter{Distribution}
 
-\section{Assumptions}
-    decentralised network composed of many multithreaded nodes
-    many nodes able to connect and disconnect to the network, 
-    each node has a local version of \PHT and can iterate over it
-    each node can insert, get and remove data from others' nodes hashtables (insert, get, remove)
-    consistent hashing mechanism is used
-    replication (replication factor) 
-    
-\section{Decentralised and symmetrical network}
-    short description of how we achieve the assumptions made in 2nd chapter (stated by Dynamo)
+This chapter covers designing a \DHTS, a distributed system for the implemented \PHT class.
 
+\section{Overview}
+
+    The described system is a decentralised network composed of many multithreaded \Nodes.
+    Since the provided application is symmetrical, each \Node has the same responsibilities as its peers and there is no superior unit.
+
+    The system operates on a \textit{Persistent Hash Table}, dividing its parts between the \Nodes.
+    Each \Node stores its \PHT fragment locally and can \iterateMethod over it.
+    Furthermore, the copy of this fragment is stored in the node's peers as a part of the replication process.
+    The number of redundant copies is determined by the \textit{replication factor}.
+    
+    \Nodes can operate on the \PHT performing operations such as \insertMethod, \getMethod and \removeMethod.
+    To simplify the process of distributing data between \Nodes when a new \Node connects or an old one disconnects, they are organised into logical ring.
+    This way a consistent hashing mechanism can be used.
+    
+    
+    An application provides administrative console which enables to manually perform \PHT actions (insert, get, remove, iterate), list all known \Nodes and test theirs connections.
+    It also can be used to bulk insert, get and remove sample data for testing purposes.
+    
 \section{Implementation details}
+    \subsection{Decentralised and symmetrical network}
+        The implemented structure presents a decentralised and symmetrical network which implies that all \Nodes have analogous structure and set of responsibilities.
+        
+        There is no superior unit which controls the network, 
+    short description of how we achieve the assumptions made in 2nd chapter (stated by Dynamo)
+    
     \subsection{Structure}  % listings and description
-        - class node: session, address, port, hash
-        - class session: connect(), read(), write()
-        - class server: accept()
-        - nodesMap: ([address, port], node)
+        \begin{itemize}
+        \item \texttt{server} -- a main class~\ref{Server} responsible for spawning threads from \std namespace, each thread asynchronously accepts and handles connections;
+        it uses io\_context object from \Asio library to handle epoll on Linux,
+        \item \texttt{session} -- a wrapper for TCP socket~\ref{Session}, it implements methods such as connect, get, insert and remove,
+        \item \texttt{node} -- a class which instances contains address, hash and pointer to session associated with connected \Node
+        \item \texttt{nodes\_map} -- an unordered map of the node objects from \std namespace storing information about every known \Node
+        \item \texttt{pmap} -- an array of pointers to \PHT which size depends on replication factor.
+        \end{itemize}
+
+\begin{figure}[ht] 
+\renewcommand{\figurename}{Listing}
+    \begin{lstlisting}
+template <class K, class V>
+class Server {
+    boost::asio::io\_context &io\_context;
+    short port;
+    
+    public:
+        Server(boost::asio::io\_context &io\_context, short port);
+        void start();
+        void accept();
+}
+    \end{lstlisting}
+\label{Server}
+\caption{Server class}
+\end{figure}
+       
+\begin{figure}[ht] 
+\renewcommand{\figurename}{Listing}
+    \begin{lstlisting}
+template <class K, class V>
+class Session {
+    tcp::socket socket;
+    
+    public:
+        Session(tcp::socket socket);
+        void read();
+        void write(string message);
+        void connect(string address, string port);
+        void get(K key);
+        void insert(K key, V value);
+        void remove(K key);
+}
+    \end{lstlisting}
+\label{Session}
+\caption{Session class}
+\end{figure}
         
     \subsection{Used methods}
-        boost: connect, read\_async, etc.
+        boost: connect, async\_read\_some, async\_write, async\_accept.
         description of how these methods work
         
     \subsection{Communication protocol}
-        - when a node connects to an existing node, it gets a list of all known nodes in the system and connects to each of them
+        \Nodes in \DHTS communicate sending messages using TCP connections. Each message is a byte array composed of message type, timestamp and data separated by special character. To ensure proper operation of the system, complex generic types used in \PHT has to provide it's on serialising and deserialising methods which will convert data to byte array and back.
+        \begin{itemize}
+            \item \texttt{connect}
+            \item \texttt{nodes}
+            \item \texttt{get}
+            \item \texttt{insert}
+            \item \texttt{remove}
+        \end{itemize}
+        
+        - when a new \Node connects to an existing \Node, it gets a list of all known participants in the system and connects to each of them, it also gets items to store in its fragment of \PHT (based on position on logical ring) and items to story in copies of replicated fragments of \PHT.
         - messages are composed of: message type (connect, nodes, etc), timestamp, data
-        - serialising and serialising messages (converting a byte array to strings)
+        - serialising and deserialising messages (converting a byte array to strings)
         
     \subsection{Consistent hashing}
         \subsubsection{Hashing method}
-            pseudocode
-            source (article)
-            explanation
-            
-            We had to implement our own hashing function instead of using one from \std namespace because of its lack of determinism
+            \Node uses the same hashing method as \PHT with different range set on 360 representing an angle of the circle.
             
         \subsubsection{Logical hashing ring}
+            Both the data and \Nodes are organised into logical hashing ring.
+            Position on ring is calculated by hashing key for data and hashing address multiplied by port for \Nodes.
+            Each key is assigned to \Node with minimal hash higher than hash of the key.
+            If no \Node is found, the key is assigned to \Node with the smallest hash to ensure continuity of the ring.
+            The same process is used to find further \Nodes which will replicate the data represented by this key.
+            This approach simplifies process of redistributing existing data when new \Node joins the system.
+            It only requires to change location of keys which hashes are assigned to new participant or are replicated by ring neighbours, leaving the remaining structure intact.
             
 \section{Conflict resolutions}
     clock based on timestamp sent in each message
     
-\section{Provided User interface}  % keyboard support
-    - [SERVER] ls (get list of connected nodes)
-    - [SERVER] q (stops listening for user input)
-    - [MAP] insert K V
-    - [MAP] get K
-    - [MAP] remove K
-    - [MAP] iterate
 
 \section{Connection of the hashmap to the node}
-
-\section{Testing environment}
-    \subsection{Docker}
-        to fasten the programming environment setup, we decided to use docker
-        we had to provide own image combining PMDK libraries, NVM emulation and boost library
-
-    \subsection{HPC}
-        access to hpc to test implemented system on a high performing machines
+    Each \Node operates on local instance of \PHT which represents a fragment of data stored in \DHTS.
+    Considering that NVM is emulated in file system each \Node creates a file which is used to save data to ensure its persistence.
+    Upon request either from another \Node or keyboard input, \PHT interface is used to access the data.
+    Thanks to PHT's support for concurrency, multiple data accesses can be conducted efficiently at the same time without a need of implementing locks.
     
+
 \section{Evaluation}
+
+    \subsection{Test environment}
+        In order to accurately evaluate the implemented \DHTS we had to run several program instances in the same environment.
+        Since both \Node and \texttt{PHT} uses all available threads on a current machine, running multiple program instances on the same working station could result in ineffective performance measurements.
+        We had to conduct the distribution tests on multiple homogeneous machines, therefore we decided to use the \textit{High Performance Computing} units provided by Poznan University of Technology. 
+    
+        The described project is based on several libraries, whose building process is both complicated and time-consuming.
+        To fasten the programming environment setup we decided to use Docker \cite{Docker} --- a tool allowing us to create a virtual operating system image based on a description file.
+        We had to provide our own \textit{Dockerfile} combining \textit{PMDK} libraries, \textit{NVM} emulation and \textit{boost library}.
+        By using docker we could also clone our repository and fully automate the environment setup process.
+        
+        %todo: na HPC pamiec RAM tylko podpieta emuluje NVM, nie jest persistent 
+    
+    \subsection{Tests}
     stress tests: operating on many elements
 
 \section{Conclusions}
