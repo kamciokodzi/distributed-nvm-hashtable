@@ -818,11 +818,12 @@ void *keyboard(void *arg)
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
+        int c = std::stoi(cmd[4]);
         std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i++) {
+        for (int i = s; i < l; i+=c {
           insert(std::to_string(i), std::to_string(i));
         }
         insert(std::to_string(l), std::to_string(l), true);
@@ -835,11 +836,12 @@ void *keyboard(void *arg)
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
+        int c = std::stoi(cmd[4]);
         std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i++) {
+        for (int i = s; i < l; i+=c {
           get(std::to_string(i));
         }
         get(std::to_string(l), true);
