@@ -13,7 +13,7 @@
 #include <shared_mutex>
 #include "../map/NvmHashMap.hpp"
 
-#define REPLICATION_FACTOR 1
+#define REPLICATION_FACTOR 3
 
 auto start_time = std::chrono::system_clock::now();
 
@@ -699,7 +699,6 @@ private:
           {
             std::make_shared<session>(std::move(socket))->start();
           }
-
           do_accept();
         });
   }
@@ -1013,6 +1012,28 @@ void *keyboard(void *arg)
         }
       }
       std::cout << std::endl;
+    }
+
+    else if (cmd[0] == "count")
+    {
+      for (int i = 0; i < REPLICATION_FACTOR; i++) {
+        
+        Iterator<std::string, std::string> it(root_ptr->pmap[i]);
+
+        int count = 0;
+
+        while (it.next())
+        {
+          try
+          {
+            count++;
+          }
+          catch (...)
+          {
+          }
+        }
+        std::cout << "Elements in map "<< i << ": "<< count << std::endl;
+      }
     }
 
     else if (cmd[0] == "q")
