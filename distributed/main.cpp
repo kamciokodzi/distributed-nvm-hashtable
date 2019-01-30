@@ -18,6 +18,7 @@
 auto start_time = std::chrono::system_clock::now();
 
 std::string message_format = "_";
+std::string message_const = "";
 
 struct root
 {
@@ -638,9 +639,9 @@ public:
                                   // }
 
                                   for (int i = s; i < el; i+=c) {
-                                    insert(std::to_string(i), std::to_string(i));
+                                    insert(std::to_string(i), message_const);
                                   }
-                                  insert(std::to_string(l), std::to_string(l), true);
+                                  insert(std::to_string(l), message_const, true);
 
                                   auto end = std::chrono::system_clock::now();
                                   std::chrono::duration<double> elapsed_time = end-start_time;
@@ -885,9 +886,9 @@ void *keyboard(void *arg)
         start_time = std::chrono::system_clock::now();
 
         for (int i = s; i < l; i+=c) {
-          insert(std::to_string(i), std::to_string(i));
+          insert(std::to_string(i), message_const);
         }
-        insert(std::to_string(l), std::to_string(l), true);
+        insert(std::to_string(l), message_const, true);
 
         auto end = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_time = end-start_time;
@@ -916,9 +917,9 @@ void *keyboard(void *arg)
         }
 
         for (int i = s; i < el; i+=c) {
-          insert(std::to_string(i), std::to_string(i));
+          insert(std::to_string(i), message_const);
         }
-        insert(std::to_string(l), std::to_string(l), true);
+        insert(std::to_string(l), message_const, true);
 
         auto end = std::chrono::system_clock::now();
         std::chrono::duration<double> elapsed_time = end-start_time;
@@ -1152,6 +1153,9 @@ int main(int argc, char *argv[])
 
   for (int i = 0; i < 1024; i++ ) {
     message_format.append("0");
+  }
+  for (int i = 0; i < 512; i++ ) {
+    message_const.append("m");
   }
 
   try
