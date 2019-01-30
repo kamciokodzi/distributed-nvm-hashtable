@@ -649,14 +649,14 @@ public:
   {
     auto self(shared_from_this());
 
-    int size = msg.length();
+    int size = msg.length()+1;
 
     msg.append(message_format.substr(0,max_length - size));
 
 
     //std::cout<<msg.length() + 1<<std::endl;
 
-    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()),
+    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length() + 1),
                              [this, self](boost::system::error_code ec, std::size_t /*length*/) {
                                if (ec)
                                {
@@ -1115,7 +1115,7 @@ int main(int argc, char *argv[])
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
   //std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
-  for (int i = 0; i <= 1024; i++ ) {
+  for (int i = 0; i < 1024; i++ ) {
     message_format.append("0");
   }
 
