@@ -618,7 +618,34 @@ public:
                                 }
                                 else if (cmd[0] == "test")
                                 {
-                                  std::cout << "test" << std::endl;
+                                  int size = nodes_map.size();
+
+                                  int l = 2600000;
+                                  int s = std::stoi(cmd[1]);
+                                  int el = std::stoi(cmd[2]);
+                                  int c = std::stoi(cmd[3]);
+                                  int j = 1;
+
+                                  std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+                                  start_time = std::chrono::system_clock::now();
+
+                                  // for (const auto &[key, value] : nodes_map)
+                                  // {
+                                  //   if (key != my_addr) {
+                                  //     value._session->write("test_" + std::to_string(el*j) + "_" + el + "_" + c);
+                                  //     j++;
+                                  //   }          
+                                  // }
+
+                                  for (int i = s; i < el; i+=c) {
+                                    insert(std::to_string(i), std::to_string(i));
+                                  }
+                                  insert(std::to_string(l), std::to_string(l), true);
+
+                                  auto end = std::chrono::system_clock::now();
+                                  std::chrono::duration<double> elapsed_time = end-start_time;
+                                  std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+
                                 }
                                 else if (cmd[0] == "sleep")
                                 {
@@ -868,19 +895,27 @@ void *keyboard(void *arg)
       }
       else if (cmd[1] == "2") 
       {
-        // for (const auto &[key, value] : nodes_map)
-        // {
-        //   result.append(value.addr + split + value.port + split);
-        // }
+        
+        int size = nodes_map.size();
 
         int l = 2600000;
         int s = 0;
+        int el = 2600000 / size;
         int c = 13;
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        int j = 1;
 
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c) {
+        for (const auto &[key, value] : nodes_map)
+        {
+          if (key != my_addr) {
+            value._session->write("test_" + std::to_string(el*j) + "_" + std::to_string(el) + "_" + std::to_string(c));
+            j++;
+          }          
+        }
+
+        for (int i = s; i < el; i+=c) {
           insert(std::to_string(i), std::to_string(i));
         }
         insert(std::to_string(l), std::to_string(l), true);
