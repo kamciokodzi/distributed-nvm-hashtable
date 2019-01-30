@@ -649,14 +649,14 @@ public:
   {
     auto self(shared_from_this());
 
-    int size = msg.length()+1;
+    int size = msg.length();
 
     msg.append(message_format.substr(0,max_length - size));
 
 
     //std::cout<<msg.length() + 1<<std::endl;
 
-    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length() + 1),
+    boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length()),
                              [this, self](boost::system::error_code ec, std::size_t /*length*/) {
                                if (ec)
                                {
@@ -850,6 +850,29 @@ void *keyboard(void *arg)
       }
       else if (cmd[1] == "1") 
       {
+        int l = 2600000;
+        int s = 0;
+        int c = 13;
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+
+        start_time = std::chrono::system_clock::now();
+
+        for (int i = s; i < l; i+=c) {
+          insert(std::to_string(i), std::to_string(i));
+        }
+        insert(std::to_string(l), std::to_string(l), true);
+
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end-start_time;
+        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+      }
+      else if (cmd[1] == "2") 
+      {
+        for (const auto &[key, value] : nodes_map)
+        {
+          result.append(value.addr + split + value.port + split);
+        }
+
         int l = 2600000;
         int s = 0;
         int c = 13;
@@ -1092,7 +1115,7 @@ int main(int argc, char *argv[])
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
   //std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
-  for (int i = 0; i < 1024; i++ ) {
+  for (int i = 0; i <= 1024; i++ ) {
     message_format.append("0");
   }
 
