@@ -2,38 +2,37 @@
 
 \section{Motivations}
 
-Traditional computers use two types of memories: Random Access Memory (RAM) for direct data access and Solid-State or Hard-Disk Drives (SSD, HDD) for its long-term storage. Although RAM allows quick access to memory, the data it stores are volatile and hence are lost after each system shutdown. On the other hand, both SSDs and HDDs provide persistent storage but at the cost of much higher access latency compared to RAM.
+Traditional computers use two types of memories: Random Access Memory (RAM) for direct data access and Solid-State or Hard-Disk Drives (SSD, HDD) for its long-term storage. Although RAM enables quick access to memory, the data it stores are volatile and hence are lost after each system shutdown. On the other hand, both SSDs and HDDs provide persistent storage but at the cost of much higher access latency compared to RAM.
 
-Recently one can observe the emergence of a new technology called \emph{Non-Volatile Memory (NVM)} (sometimes also referred to as \emph{Persistent Memory, PM}). NVM is aimed as a replacement for both RAM and disks by combining their best features. NVM promises high throughput, low latency and byte addressability, similarly to RAM, but it will also guarantee data persistence in case of power outage \cite{NvmPerformanceArticle} \tk{Other references maybe?}. 
+Recently one can observe the emergence of a new technology called \emph{Non-Volatile Memory} (NVM) (sometimes also referred to as \emph{Persistent Memory}, PM). NVM is aimed as a replacement for both RAM and disks by combining their best features. NVM promises high throughput, low latency and byte addressability, similarly to RAM, but it will also guarantee data persistence in case of power outage \cite{NvmPerformanceArticle}. 
 
-NVM creates new possibilities as well as many challenges in the IT sector. Incorporating NVM will result in significant improvements in the performance of computer systems. It is because storing and retrieving large amounts of data will happen much more quickly and will not require managing complicated caching mechanisms to overcome the performance limitations of the traditional data storage solutions. NVM will also ease the process of recovery after computer crashes, i.e., providing data durability will be straightforward and loading data from disks to memory upon recovery will not be necessary any longer. Therefore one can expect that the use of NVM will particularly beneficial in distributed systems, which often feature crash recovery procedures that heavily rely on the synchronous access to the stable storage. 
+NVM creates new possibilities as well as many challenges in the IT sector. Incorporating NVM will result in significant improvements in the performance of computer systems. It is because storing and retrieving large amounts of data will happen much more quickly. Moreover, thanks to NVM, complex services running on the Internet will not require complicated caching mechanisms to overcome the performance limitations of the traditional data storage solutions. NVM will also ease the process of recovery after computer crashes, i.e., providing data durability will be straightforward and the time consuming process of loading data from disks to memory upon recovery will not be necessary any longer. Therefore one can expect that the use of NVM will particularly beneficial in distributed systems, which often feature crash recovery procedures that heavily rely on the synchronous access to the stable storage. 
 
 However, leveraging the capabilities of NVM means that a new approach to designing and implementing applications is needed. In particular, memory has to be carefully allocated so no memory leaks occur when the application crashes. For the similar reason, write operations to NVM must be properly managed in order to ensure that the data kept in memory is always consistent.
 
 \section{Goal}
 
 The main goal of the following thesis was to design, implement and test the \textbf{NVM-enabled distributed hash table system} and thus to evaluate the benefits and costs of using NVM to create a highly available distributed application. 
-% System assumptions were to create a distributed system with usage of NVM. % kn same sentence as the previous one
-The design of our system, which is called \tk{name}, follows the principles of Amazon Dynamo \cite{??}. It means that the system is composed of multiple nodes, each of which has similar responsibilities (there is no central coordinator) and that the system can easily scale horizontally by adding new nodes to it. Nodes communicate using a gossip protocol. For durability, each node stores data in a custom-built NVM-enabled hash table called \emph{Persistent Hash Table (\PHT)}. In order to provide high availability data is additionally replicated across multiple nodes. The level of data replication is tunable via a configuration parameter.
+The design of our system, which is called \DHTS, follows the principles of Amazon Dynamo \cite{AmazonDynamo}. It means that the system is composed of multiple nodes, each of which has similar responsibilities (there is no central coordinator) and that the system can easily scale horizontally by adding new nodes to it. Nodes communicate using a gossip protocol. For durability, each node stores data in a custom-built NVM-enabled hash table called \emph{Persistent Hash Table (\PHT)}. In order to provide high availability data is additionally replicated across multiple nodes. The level of data replication is tunable via a configuration parameter.
 
 In order to build \PHT, our local NVM-enabled hash table, we relied on \emph{Persistent Memory Development Kit} \cite{PmemIo}, a set of libraries and tools provided by Intel for NVM. NVM is a new technology and although some NVM hardware is already available on the market, we did not have access to it. Therefore we opted for NVM emulation using RAM.
 
-We developed a range of tests to evaluate the performance independently for \PHT and \tk{name}. The tests results of \PHT show the inherent overhead introduced by using NVM to manage data: accessing and modifying data stored in NVM is 2-10 times slower compared to similar operations performed on volatile RAM. Moreover, NVM requires that some metadata are stored alongside data. The memory overhead is in the order of ??. 
+We developed a range of tests to evaluate the performance independently for \PHT and \DHTS. The tests results of \PHT show the inherent overhead introduced by using NVM to manage data: accessing and modifying data stored in NVM is 2-10 times slower compared to similar operations performed on volatile RAM. Moreover, NVM requires that some metadata are stored alongside data. The memory overhead is caused by the fact that in NVM libraries memory has to be allocated in blocks of fixed size. 
 
-We deployed \tk{name} on the HPC cluster available at the faculty's premises. The test results indicate that the systems scales well with the increasing number of nodes and that it correctly copes with machine crashes.
+We deployed \DHTS on the HPC cluster available at the faculty's premises. The test results indicate that the system scales well with the increasing number of nodes.
 
 \section{Thesis structure}
 
-The structure of the thesis is as follows. In Chapter~\ref{??} we discuss NVM in more detail and we describe tools and libraries used implementing  \tk{name}. We discuss the implementation details and the evaluation of \PHT in Chapter~\ref{??}. The design and implementation of \tk{name} is given in Chapter~\ref{??}. We conclude in Chapter~\ref{??}.
+The structure of the thesis is as follows. In Chapter~\ref{Background} we discuss NVM in more detail and we describe tools and libraries used implementing \DHTS. We discuss the implementation details and the evaluation of \PHT in Chapter~\ref{OwnWork}. The design and implementation of \DHTS is given in Chapter~\ref{Distribution}. We conclude in Chapter~\ref{Conclusion}.
 
 \bigskip
 
 \noindent Below we outline the roles of each co-author in this project:
 \begin{itemize}
-    \item Patryk Stasiewski -- the configuration of the \NVM programming environment, the design and implementation of \PHT,
-    \item Kinga Neumann -- the design and implementation of \PHT, the development of unit tests of \PHT,
-    \item Kamil Kołodziej -- the configuration of the virtualization environment using Docker, the design and implementation of \tk{name},
-    \item Miłosz Pogodski -- the design and implementation of \tk{name}, tests of \tk{name}.
+    \item Patryk Stasiewski -- the configuration of the \NVM programming environment, the design and implementation of \emph{\PersistentHashTable},
+    \item Kinga Neumann -- the design and implementation of \emph{\PersistentHashTable}, the development of unit tests of \emph{\PersistentHashTable},
+    \item Kamil Kołodziej -- the configuration of the virtualization environment using Docker, the design and implementation of \DHTS,
+    \item Miłosz Pogodski -- the design and implementation of \DHTS, tests of \DHTS.
 \end{itemize}
 
 
