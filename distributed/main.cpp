@@ -17,6 +17,8 @@
 
 auto start_time = std::chrono::system_clock::now();
 
+std::string message_format = "_";
+
 struct root
 {
   pmem::obj::persistent_ptr<NvmHashMap<std::string, std::string>> pmap[REPLICATION_FACTOR];
@@ -348,7 +350,7 @@ public:
                                     if (vec[i] == (cmd[2] + ":" + cmd[3]))
                                     {
                                       place = i;
-                                      std::cout << "Place: " << place << std::endl;
+                                      //std::cout << "Place: " << place << std::endl;
                                     }
                                   }
 
@@ -429,16 +431,18 @@ public:
                                   bool last = true;
                                   for (int i = 2; i < cmd.size(); i += 2)
                                   {
-                                    if (nodes_map.find(cmd[i] + ":" + cmd[i + 1]) == nodes_map.end())
-                                    {
-                                      last = false;
-                                      try
+                                    if (cmd[i].size() > 4 && cmd[i].size()  < 20) {
+                                      if (nodes_map.find(cmd[i] + ":" + cmd[i + 1]) == nodes_map.end())
                                       {
-                                        tcp::socket sock(io_context);
-                                        std::make_shared<session>(std::move(sock))->connect(cmd[i], cmd[i + 1]);
-                                      }
-                                      catch (...)
-                                      {
+                                        last = false;
+                                        try
+                                        {
+                                          tcp::socket sock(io_context);
+                                          std::make_shared<session>(std::move(sock))->connect(cmd[i], cmd[i + 1]);
+                                        }
+                                        catch (...)
+                                        {
+                                        }
                                       }
                                     }
                                   }
@@ -515,7 +519,11 @@ public:
                                       nodes_map[vec[0]]._session->insert(cmd[2], cmd[3]);
                                     }
                                     if (cmd.size() >= 5) {
-                                      write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
+                                      if (cmd[4] == "last") {
+                                        write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
+                                      } else {
+                                        write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
+                                      }
                                     } else {
                                       write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
                                     }                                    
@@ -640,6 +648,14 @@ public:
   void write(std::string msg)
   {
     auto self(shared_from_this());
+
+    int size = msg.length()+1;
+
+    msg.append(message_format.substr(0,max_length - size));
+
+
+    //std::cout<<msg.length() + 1<<std::endl;
+
     boost::asio::async_write(socket_, boost::asio::buffer(msg.c_str(), msg.length() + 1),
                              [this, self](boost::system::error_code ec, std::size_t /*length*/) {
                                if (ec)
@@ -812,13 +828,31 @@ void *keyboard(void *arg)
     std::getline(std::cin, command);
     std::vector<std::string> cmd = deserialize(command, ' ');
 
-    if (cmd[0] == "test" && cmd.size() >= 4)
+    if (cmd[0] == "test")
     {
       if (cmd[1] == "insert") 
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
         int c = std::stoi(cmd[4]);
+        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+
+        start_time = std::chrono::system_clock::now();
+
+        for (int i = s; i < l; i+=c) {
+          insert(std::to_string(i), std::to_string(i));
+        }
+        insert(std::to_string(l), std::to_string(l), true);
+
+        auto end = std::chrono::system_clock::now();
+        std::chrono::duration<double> elapsed_time = end-start_time;
+        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+      }
+      else if (cmd[1] == "1") 
+      {
+        int l = 2600000;
+        int s = 0;
+        int c = 13;
         std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
 
         start_time = std::chrono::system_clock::now();
@@ -1056,6 +1090,11 @@ int main(int argc, char *argv[])
   my_addr = vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>();
 
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
+  //std::string path = "hashmapFile" + vm["port"].as<std::string>();
+
+  for (int i = 0; i < 1024; i++ ) {
+    message_format.append("0");
+  }
 
   try
   {
