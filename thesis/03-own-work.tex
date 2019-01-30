@@ -69,7 +69,8 @@ class NvmHashMap {
         for (int i = 0; i < 5; i++) {
             b = j;
             key = key * 2862933555777941757ULL + j;
-            j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+            j = (b + 1) * (double(1LL << 31) / 
+                double((key >> 33) + 1));
         }
         return fabs(b % range);
     }
@@ -350,12 +351,21 @@ V remove (K key) {
     
     The \insertMethod method in the NVM implementation takes the longest time since it allocates memory and creates a new object. Furthermore, it requires an exclusive access to the \internalHashMap and resizes it when necessary. Since in each test the \texttt{threads} number varies, there is a different number of \internalHashMap objects. In the test with only one thread, the sole \internalHashMap expands about nine times while inserting 5,000,000 key-value pairs. On the contrary, the test with 8 threads uses 8 \internalHashMaps and therefore each of them expands 7 times on average. 
     
-    The \getMethod operation is the fastest of implemented methods as it requires only a shared access to the \internalHashMap. It is about 2.5 times slower in the NVM-enabled implementation compared to \StandardHashMap, because \tk{what transaction in \getMethod? Not consistent with what you said earlier about the \getMethod method.} every time a transaction starts, PMDK creates a snapshot of the persistent memory.
-    It is used for tracking the changes made during the transaction and may be used to revert them in case that the transaction will be rolled back.
+    The \getMethod operation is the fastest of implemented methods as it requires only a shared access to the \internalHashMap.
+    It is about 2.5 times slower in the NVM-enabled implementation compared to \StandardHashMap, what means that access to persistent memory is generally slower than access to DRAM. 
+    That overhead is caused by emulation.
+    %every time a transaction starts, PMDK creates a snapshot of the persistent memory.
+    %It is used for tracking the changes made during the transaction and may be used to revert them in case that the transaction will be rolled back.
+    % \tk{what transaction in \getMethod? Not consistent with what you said earlier about the \getMethod method.}
     
     The \removeMethod method turns out to be about 5 times slower in the NVM-based environment than the RAM one. It turns out to be a little bit faster compared to the \insertMethod, because freeing an object requires less work compared to allocating memory. Still, however, \removeMethod needs to do so in a PMDK transaction. 
     
-    Besides measuring the throughput of \PHT in comparison to the \StandardHashMap's performance, we are interested in the memory overhead resulting from storing data in NVM. \tk{In how much space?} In case of \StandardHashMap we are able to insert around 800,000 pairs \tk{what was in them, ints? strings? how big?} of \integersMap into the map. \PHT is less memory efficient and allows us to insert only 136,000 pairs of \integersMap. This disparity can be explained by the fact that currently the \libpmemobjcpp library allows one only to allocate pointers to persistent memory for blocks which are at least 4 KB in size.
+    %\tk{what was in them, ints? strings? how big?} -- (int, int) pairs
+    %\tk{In how much space?}
+    Besides measuring the throughput of \PHT in comparison to the \StandardHashMap's performance, we are interested in the memory overhead resulting from storing data in NVM. 
+    To perform this test we decided to limit memory which may be allocated by \PHT and \StandardHashMap to 100 MB.
+    In case of \StandardHashMap we are able to insert around 800,000 pairs of \integersMap into the map. \PHT is less memory efficient and allows us to insert only 136,000 pairs of \integersMap. 
+    This disparity can be explained by the fact that currently the \libpmemobjcpp library allows one only to allocate pointers to persistent memory for blocks which are at least 4 KB in size.
     %\noindent \tk{What about the memory footprint? How many key-value pairs can you insert into lets say 100MB of memory in \PHT and \unorderedMap?}. 
     
     To sum up, \PHT is a considerably slower compared to \StandardHashMap, but it allows data to be recovered upon the process crash. The observed overhead is due to additional processing required when working with NVM. 
@@ -365,8 +375,6 @@ V remove (K key) {
 \section{Conclusions}
         
     In this chapter we discussed \PHT, a custom-built hash table, which supports non-volatile memory. 
-    % Implementing it meant overcoming a number of challenges, e.g. correctly defining operations within \tk{pmdk?} transactions, handling generic data types in and concurrency or choosing the suitable hash function. 
-    % \tk{This kind of sentence probably should be in the final conclusions.} However, using the \libpmemobj library has helped us to understand better how NVM works. 
     Extensive tests allowed us to ensure its correctness and uncover several subtle bugs related to ensuring consistency of data upon process crashes.
     
     Unsurprisingly, \PHT turns out to be slower than a standard concurrent implementation of a hash table (\StandardHashMap), which relies solely on RAM. Our tests indicate that using NVM incurrs a significant but still acceptable overhead.

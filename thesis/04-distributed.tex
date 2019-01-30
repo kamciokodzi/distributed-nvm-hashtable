@@ -4,14 +4,16 @@ This chapter covers designing \DHTS, a distributed hash table system based on th
 
 \section{Overview}
 
-    \DHTS (DHTS) utilizes a network of \Nodes which run the provided multithreaded application.
+    \DHTS (DHTS) utilises a network of \Nodes which run the provided multithreaded application.
     Since the application is symmetrical and decentralised, each \Node has the same set of responsibilities as its peers, and none of the \Nodes is distinguished as a coordinator or a supervisor.
 
     The system operates on \textit{Persistent Hash Table}, dividing its key-value pairs between the \Nodes.
     Each \Node stores its \PHT fragment locally and can \iterateMethod over it.
     The copy of this fragment is kept by some of the node's peers as a part of the replication process. 
-    The number of redundant copies is determined by the \textit{replication factor}.
-    
+    The number of all the copies of a specified \PHT fragment occurring in the system is determined by the \textit{replication factor}.
+    Clarifying, each \Node stores not only its own fragment of \PHT but also copies of \texttt{PHTs} of its closest predecessors on a logical hashring.
+    This way every \Node stores at least one different part of the \PHT than others.
+
     The \Nodes can operate on the \PHT performing operations such as \insertMethod, \getMethod and \removeMethod.
     To simplify the process of distributing data the \Nodes are organised into a logical ring.
     This way the \textit{consistent hashing} mechanism can be used.
@@ -35,7 +37,7 @@ This chapter covers designing \DHTS, a distributed hash table system based on th
         All the specified requirements result in a higher complexity of the \Node implementation.
         Notwithstanding, it is an insignificant cost compared to the obtained greater system resistance to failures.
 
-    \subsection{Structure}  % listings and description
+    \subsection{Structure}
         The implemented system is composed of several components.
 
         In order to easily establish and maintain the connection between network participants we provide the \Session class.
@@ -43,8 +45,8 @@ This chapter covers designing \DHTS, a distributed hash table system based on th
         
         \begin{itemize}
             \item \texttt{connect} -- tries to establish a connection on a socket with a \Node listening on the given IP address and port,
-            \item \texttt{read} -- wraps async\_read method from \Asio with exception handling; it also serves incoming messages,
-            \item \texttt{write} -- wraps async\_write method from \Asio with exception handling,
+            \item \texttt{read} -- wraps \texttt{async\_read} method from \Asio with exception handling; it also serves incoming messages,
+            \item \texttt{write} -- wraps \texttt{async\_write} method from \Asio with exception handling,
             \item \texttt{get} -- prepares a get request for a given key and sends it over the socket,
             \item \texttt{insert} -- prepares an insert request for a given key with the provided data and sends it over the socket,
             \item \texttt{remove} -- prepares a remove request for a given key and sends it over the socket.
@@ -98,7 +100,8 @@ Since \textit{consistent hashing} mechanism is one of the main project assumptio
 For this purpose the \KnownNode class is provided. 
 It represents other network participants and is described in Listing~\ref{Node}.
 Each \KnownNode object consists of its own address and port as well as a pointer to the \Session object associated with the connection between itself and the \Node.
-It also stores Unix epoch time in milliseconds of the moment when connection was established.
+In the \texttt{timestamp} field it stores Unix epoch time with accuracy of milliseconds of the moment when the connection was established. 
+The value is used in conflict resolution process and described in section \ref{Conflicts}.
 Additionally, each \KnownNode has a hash value assigned. We discuss how the hash is computed later.
 
 \begin{figure}[ht] 
@@ -122,30 +125,24 @@ class KnownNode {
 \end{figure}
 
         All \texttt{KnownNodes} are stored in a simple hash map called \NodesMap.
-        To this end we use an \texttt{unordered\_map} \cite{Unordered} from the \std namespace.
-        
-        
-        All \texttt{KnownNodes} are stored in a simple hash map called \NodesMap.
-        To this end we use an \texttt{unordered\_map} \cite{Unordered} from the \std namespace.
-    name space which is an associative array storing key-value pairs.
+        To this end we use an \texttt{unordered\_map} \cite{Unordered} from the \std namespace which is an associative array storing key-value pairs.
         It provides basic operations such as \texttt{insert}, \texttt{find} or \texttt{erase} and therefore allows us to keep information about all \texttt{KnownNodes}.
         Since the \texttt{unordered\_map} requires the entries' keys to be unique, they are composed of the \texttt{KnownNode's} IP address concatenated with its port. 
         Each entry's value is an object of \KnownNode type.
         
-        \tk{This paragraph is difficult to understand}
-        Moreover, the application provides an array of pointers to \PHT used by \Node.
-        The array is called \texttt{PMap} and its size depends on the \textit{replication factor}.
-        If equal to one, there is only one entry in the array which represents \PHT fragment stored locally by the \Node.
-        Next indexes in the \texttt{PMap} array stand for replicas of the next \Node neighbours.
+        Moreover, the application stores an array of pointers to \PHT objects used by \Node.
+        The array is called \texttt{PMap} and its size is equal to the \textit{replication factor} -- a constant directive which specifies the number of element's copies in a system.
+        First element of the array represents \PHT fragment stored locally by the \Node.
+        Next indexes contains replicas of the \texttt{Node's}\xspace neighbours' data.
 
     \subsection{\Asio used methods}
         As described in Section~\ref{Background}, the \DHTS implementation is based on \Asio library.
-        Methods are basically generic depending on used protocol and wanted use case.
+        The provided methods are mostly generic, depending on used protocol and wanted use case, and therefore can be used in our system:
         \begin{itemize}
             \item \texttt{connect} - establishes connection with TCP socket.
             \item \texttt{async\_accept} - asynchronously accepts a new connection into a socket.
             \item \texttt{async\_read} - asynchronously reads number of bytes of data from socket stream.
-            \item \texttt{async\_write} - asynchronous writes a certain number of bytes of data to a socket stream.
+            \item \texttt{async\_write} - asynchronously writes a certain number of bytes of data to a socket stream.
         \end{itemize}
         
                 
@@ -162,111 +159,109 @@ class KnownNode {
             
         The same algorithm is used to find further \Nodes which are responsible for replicating the data represented by this key.
         This approach simplifies the process of redistributing existing data when new \Node joins the system.
-        It only requires to change the location of the keys which hashes are assigned to the new participant or are replicated by its closest ring neighbours, leaving the remaining structure intact.
+        It only requires to change the location of the keys whose hashes are assigned to the new participant or are replicated by its closest ring neighbours, leaving the remaining structure intact.
         
     \subsection{Communication protocol}
         \Nodes in \DHTS communicate by sending messages through TCP connections. 
         Each message is a byte array composed of message type, timestamp and data separated by special character. 
-        To ensure proper operation of the system, complex generic types used in \PHT has to provide it's on serialising and deserialising methods which will convert data to byte array and back.
+        To ensure proper operation of the system, complex generic types used in \PHT has to provide its own serialising and deserialising methods which will convert data to byte array and back. 
         \begin{itemize}
-            \item \texttt{connect} -- message is sent after \Node establishes connection with any other member of the network, it contains information about port on which \Node is accepting new connections; when read, a \Node creates new object of \KnownNode with information about connection, then it sends a nodes message; after that \Node calculates which elements from his local \PHT fragment should be stored in new member of the network (based on theirs position on hashing ring) and sends them over; then \Node determines if new participant should be his replicator, if so the whole local \PHT fragment is sent
-            \item \texttt{nodes} -- message is sent as a response to connect message, it contains information about every known node stored in \NodesMap; when read, reader adds every \Node to \NodesMap and tries to connect to those which are not yet connected,
-            \item \texttt{get} -- message is sent when \Node requests access to data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring, if it is the \Node access an instance of \PHT to get the data; if data is found it is returned as a part of a result message otherwise result message contains an information that element was not found; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, message is redirected to appropriate \Node,
-            \item \texttt{insert} -- message is sent when \Node wants to insert data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring, if it is the \Node access an instance of \PHT to insert the data; result message contains information about insertion status; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, message is redirected to appropriate \Node,
-            \item \texttt{remove} -- message is sent when \Node wants to remove data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring, if it is the \Node access an instance of \PHT to remove the data; result message contains information about removal status; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, message is redirected to appropriate \Node,
+            \item \texttt{connect} -- message is sent after \Node establishes connection with any other member of the network, it contains information about port on which \Node is accepting new connections; when read, a \Node creates new object of \KnownNode with information about connection, then it sends a \texttt{nodes} message (see below); after that \Node calculates which elements from his local \PHT fragment should be stored in new member of the network (based on theirs position on hashing ring) and sends them over; then \Node determines if new participant should be his replicator, if so the whole local \PHT fragment is sent;
+            \item \texttt{nodes} -- message is sent as a response to connect message, it contains information about every known node stored in \NodesMap; when read, reader adds every \Node to \NodesMap and tries to connect to the ones which are not connected yet;
+            \item \texttt{get} -- message is sent when \Node requests access to data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring; if so, the \Node accesses an instance of \PHT to get the data; if data is found it is returned as a part of a result message, otherwise result message contains an information that element was not found; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, the message is redirected to appropriate \Node;
+            \item \texttt{insert} -- message is sent when \Node wants to insert data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring; if so, the \Node accesses an instance of \PHT to insert the data; result message contains information about insertion status; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, the message is redirected to appropriate \Node;
+            \item \texttt{remove} -- message is sent when \Node wants to remove data with a specified key; when read, a \Node determines if its hash is associated with \texttt{Node's} position on the hash ring; if so, the \Node accesses an instance of \PHT to remove the data; result message contains information about removal status; if \Node states that key's hash is not associated with \texttt{Node's} position on the hash ring, the message is redirected to appropriate \Node.
         \end{itemize}
         
 
-\section{Conflict resolutions}
+\section{Conflict resolutions} \label{Conflicts}
     Every message contains a clock based on Unix time in milliseconds.
-    It is used to resolve conflict in situation when \Node disconnects and reconnects to system before information about his absence is acknowledged by everyone in the system.
-    If message stating that \Node is disconnected arrives after connection message, it is ignored.
+    It is used to resolve conflicts in situations when a \Node disconnects and reconnects to system before the information about its absence is acknowledged by everyone in the system.
+    If a message stating that \Node is disconnected arrives after a connection message, it is ignored.
+    
+    However, considering the replication mechanism additional steps must be taken to resolve the conflicts properly.
+    To ensure the correctness of the \texttt{remove} method tombstones need to be implemented.
+    They are flags used to mark which elements were in the \PHT and were deleted and should not be added during a conflict resolution.
+    This approach is crucial when a node reconnects to the network after a period of absence.
 
-\section{Connection of the hashmap to the node}
-    Each \Node operates on local instance of \PHT which represents a fragment of data stored in \DHTS.
+\section{Connection of \PHT to the node}
+    Each \Node operates on a local instance of \PHT which represents a fragment of data stored in \DHTS.
     Considering that NVM is emulated in file system each \Node creates a file which is used to save data to ensure its persistence.
     Upon request either from another \Node or keyboard input, \PHT interface is used to access the data.
-    Thanks to PHT's support for concurrency, multiple data accesses can be conducted efficiently at the same time without a need of implementing locks.
+    Thanks to PHT's support for concurrency, multiple data accesses can be conducted efficiently at the same time without the need of implementing locks.
 
 \section{Evaluation}
 
     \subsection{Test environment}
         In order to accurately evaluate the implemented \DHTS we had to run several program instances in the same environment.
-        Since both \Node and \texttt{PHT} uses all available threads on a current machine, running multiple program instances on the same working station could result in ineffective performance measurements.
-        We had to conduct the distribution tests on multiple homogeneous machines, therefore we decided to use the \textit{High Performance Computing} units provided by Poznan University of Technology. 
+        Since \Node uses all available threads on a current machine, running multiple program instances on the same working station could result in ineffective performance measurements.
+        We had to conduct the distribution tests on multiple homogeneous machines, therefore we decided to use the \textit{High Performance Computing} units provided by Poznan University of Technology with the following specification:
         
-        by the memory size. We conducted tests using the following:
-    \begin{itemize}
-        \item 4-core processor Intel Xeon X3230 CPU@2.6GHz, % 0.8 GHz - 3.6 GHz,
-        \item RAM: 4 GB,
-        \item RAM for NVM emulation: 512 MB,
-        \item Operating system: Fedora Linux 27
-    \end{itemize}
-    
-        The described project is based on several libraries, whose building process is both complicated and time-consuming.
-        To fasten the programming environment setup we decided to use Docker \cite{Docker} --- a tool allowing us to create a virtual operating system image based on a description file.
+        \begin{itemize}
+            \item 4-core processor Intel Xeon X3230 CPU@2.6GHz,
+            \item RAM: 4 GB,
+            \item RAM for NVM emulation: 512 MB,
+            \item Operating system: Fedora Linux 27
+        \end{itemize}
+        
+        The described project is based on several libraries whose building process is both complicated and time-consuming.
+        To fasten the programming environment setup we decided to use \textit{Docker} \cite{Docker} --- a tool allowing us to create a virtual operating system image based on a description file.
         We had to provide our own \textit{Dockerfile} combining \textit{PMDK} libraries, \textit{NVM} emulation and \textit{boost library}.
-        By using docker we could also clone our repository and fully automate the environment setup process.
+        We were unable to create DAX-enabled file system using Docker, so we decided to mount part of available RAM memory as \texttt{tmpfs} storage in the filesystem.
+        By using \textit{Docker} we could also clone our repository and fully automate the environment setup process.
         
-        %todo: na HPC pamiec RAM tylko podpieta emuluje NVM, nie jest persistent 
-    
     \subsection{Tests}
     
         To evaluate the performance scalability of the implemented \DHTS we performed several stress tests.
         
-        At first, we decided to analyse the situation in which one thread in one \Node inserts a specified number of elements to an existing network. We performed this test in two variants -- with replication factor 1 and 3.
+        At first, we decided to analyse a situation in which one thread in one \Node inserts a specified number of elements to an existing network. 
+        We measured the time it takes to execute this operation depending on how many \Nodes are already connected to the network.
+        We performed this test in two variants -- with replication factor equal to 1 and 3.
         
+        In the first variant -- Figure~\ref{rf1} -- each element is inserted once and one can observe as time decreases as the network expands 
+        due to distribution of inserted elements between participants the insertion process is accelerating to the point when it reaches minimal time needed by one thread to process the data and send proper messages.
         
-        In first variant  -- figure~\ref{rf1} each element is inserted once so decrease in time needed to achieve this task can be observed after adding just one \Node.
-        It is thanks to distribution of inserted elements between participants.
-        The insertion process is accelerating to the point when it reaches minimal time needed by one thread to process the data and send proper messages.
-        
-        
-        In second variant -- figure~\ref{rf3} increase in time needed to achieve this task can be noticed.
-        Improvement is directly connected to used replication level.
-        If only one \Node is in network it has to insert every element once, but when another \Node is added, every \Node has to insert every element twice -- in a local \PHT fragment and in a replicated \PHT fragment of another \Node.
-        A chart reaches peak when number of nodes is equal to replication factor -- every \Node has to insert each element three times.
-        Then the time needed for insertion is decreasing thanks to distribution of work.
-        Scaling on many \Nodes reaches minimal time needed for one thread to process the data and send proper messages.
-        
-        
-        In second test -- figure~\ref{mrf3}, we analysed the situation in which inserted elements are equally divided between members of the network.
-        Input data is processed on one thread on each \Node in opposition to first test where only one thread on one \Node processed the input data.
-        Thanks to this, insertion can be completed in less time than previously even though replication factor is set to 3 and every element is inserted three times from the moment when number of \Nodes reaches 3.
-
-    \begin{figure}[ht]
-        \centering
-        \includegraphics[width=0.8\textwidth]{thesis/figures/rf1.png}
-        \caption{Time measurements for inserting 200,000 elements by one \Node with replication factor 1}
-        \label{rf1}
-    \end{figure}
+        \begin{figure}[H]
+            \centering
+            \includegraphics[width=0.8\textwidth]{thesis/figures/rf1.png}
+            \caption{Time measurements for inserting 200,000 elements by one \Node with replication factor 1}
+            \label{rf1}
+        \end{figure}
     
-    \begin{figure}[ht]
-        \centering
-        \includegraphics[width=0.8\textwidth]{thesis/figures/rf3.png}
-        \caption{Time measurements for inserting 200,000 elements by one \Node with replication factor 3}
-        \label{rf3}
-    \end{figure}
+        The second variant -- Figure~\ref{rf3} -- measures the same situation, only to be differentiated by the \textit{replication factor} equal to 3.
+        A significant time overhead can be noticed due to used replication mechanism.
+        If the network consists of only one \Node, then this \Node has to insert each element once. However, when another \Node joins the system, every \Node has to insert every element twice -- in a local \PHT fragment and in a replicated \PHT fragment of another \Node.
+        A plot reaches its peak when the number of nodes is equal to the \textit{replication factor} and thus every \Node has to insert each element three times.
+        Afterwards the time needed for insertion is decreasing due to the work distribution.
+        In the end, similarly to the previous test case, we reach a minimal time needed for one thread to process the data and send proper messages.
+        This behaviour proves the system scalability irrespective of the \textit{replication factor}.
+        
+        \begin{figure}[ht]
+            \centering
+            \includegraphics[width=0.8\textwidth]{thesis/figures/rf3.png}
+            \caption{Time measurements for inserting 200,000 elements by one \Node with replication factor 3}
+            \label{rf3}
+        \end{figure}
+        
+        In the second test -- Figure~\ref{mrf3}, we analysed the situation in which inserted elements are equally distributed between members of the network.
+        Input data is processed by one thread on each \Node in opposition to the first test where only one thread on one \Node processed the input data.
+        As a result, insertion is completed in shorter time than previously even though replication factor is set to 3 and every element is inserted three times from the moment when
+        number of \Nodes reaches 3.
     
-    \begin{figure}[ht]
+    \begin{figure}[H]
         \centering
         \includegraphics[width=0.8\textwidth]{thesis/figures/rf3MultipleInserts.png}
         \caption{Time measurements for multiple \Nodes inserting 200,000 elements altogether with replication factor 3}
         \label{mrf3}
     \end{figure}
-    
 
 \section{Conclusions}
-    In this chapter we discussed  \DHTS, a distributed system for the implemented \PHT class.
-    Extensive tests allowed us to ensure its correctness and uncover several bugs related to communication process.
+    In this chapter we discussed \DHTS, a distributed system for the implemented \PHT class.
     
-    
-    We managed to build symmetrical and decentralised system in which each participant has the same set of responsibilities and there is no superior unit.
-    It provides basic actions necessary to test \PHT such as \insertMethod, \getMethod and \removeMethod.
-    We have also implemented consistent hashing and replication mechanisms which are standards modern distributed solutions.
-    
-    
-    Prepared \DHTS implementation allowed us to test scalability of \PHT in distributed environment.
-    
-    
+    We managed to develop a symmetrical and decentralised system in which each participant has the same set of responsibilities and there is no superior unit.
+    It provides basic operations necessary to operate on \PHT such as \insertMethod, \getMethod and \removeMethod.
+    We have also implemented consistent hashing and replication mechanisms which are the standards of modern distributed solutions.
+    Extensive tests allowed us to ensure its correctness and uncover several bugs related to the communication process.
+
+    Prepared \DHTS implementation allowed us to test scalability of \PHT in distributed environment. 
     The described system provides the major assumptions of the project, however, it leaves room for improvement, especially in failure detection area.
