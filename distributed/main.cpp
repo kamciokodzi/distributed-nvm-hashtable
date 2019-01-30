@@ -720,7 +720,7 @@ public:
   tcp::socket socket_;
   enum
   {
-    max_length = 1024
+    max_length = 4096
   };
   char data_[max_length];
 };
@@ -1151,10 +1151,10 @@ int main(int argc, char *argv[])
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
   //std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
-  for (int i = 0; i < 1024; i++ ) {
+  for (int i = 0; i < 4096; i++ ) {
     message_format.append("0");
   }
-  for (int i = 0; i < 512; i++ ) {
+  for (int i = 0; i < 2048; i++ ) {
     message_const.append("m");
   }
 
