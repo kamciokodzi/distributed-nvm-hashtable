@@ -868,10 +868,10 @@ void *keyboard(void *arg)
       }
       else if (cmd[1] == "2") 
       {
-        for (const auto &[key, value] : nodes_map)
-        {
-          result.append(value.addr + split + value.port + split);
-        }
+        // for (const auto &[key, value] : nodes_map)
+        // {
+        //   result.append(value.addr + split + value.port + split);
+        // }
 
         int l = 2600000;
         int s = 0;
