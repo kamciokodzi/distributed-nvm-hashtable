@@ -43,12 +43,21 @@ public:
   std::string addr;
   std::string port;
   std::int32_t hash;
+  long time_stamp;
   node(session *s, std::string a, std::string p, std::int32_t h)
   {
     this->_session = s;
     this->addr = a;
     this->port = p;
     this->hash = h;
+  }
+  node(session *s, std::string a, std::string p, std::int32_t h, long ts)
+  {
+    this->_session = s;
+    this->addr = a;
+    this->port = p;
+    this->hash = h;
+    this->time_stamp = ts;
   }
   node(session *s, std::string a, std::string p)
   {
@@ -194,7 +203,7 @@ public:
     tcp::resolver resolver(io_context);
     boost::asio::connect(socket_, resolver.resolve(addr, port));
     write("connect_" + std::to_string(timestamp()) + "_" + vm["my_addr"].as<std::string>() + "_" + vm["port"].as<std::string>() + "_" + std::to_string(nodes_map[vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()].hash));
-    node n = node(this, addr, port, ip_hash(addr, port));
+    node n = node(this, addr, port, ip_hash(addr, port), timestamp());
     nodes_map[addr + ":" + port] = n;
     do_read();
   }
@@ -211,7 +220,7 @@ public:
         {
           std::cout << "New node: " << cmd[2] << ":" << cmd[3] << std::endl;
           std::cout << cmd[4] << std::endl;
-          node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0));
+          node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0),  timestamp());
           nodes_map[cmd[2] + ":" + cmd[3]] = n;
           write("nodes_" + std::to_string(timestamp()) + "_" + serialize(nodes_map));
         }
