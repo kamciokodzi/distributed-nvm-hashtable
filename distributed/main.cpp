@@ -282,35 +282,9 @@ std::string str_timestamp()
 }
 
 
-void broadcast_insert(std::string key, std::string value)
-{
-  auto vec = find_nodes(hash(key));
-  for (int i = 0; i < vec.size(); i++)
-  {
-    std::string location = vec[i];
-    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
-    {
-      std::unique_lock lock(nodes_mutex);
-      nodes_map[location]._session->insert(key, value);
-      lock.unlock();
-    }
-  }
-}
+void broadcast_insert(std::string key, std::string value);
 
-void broadcast_remove(std::string key)
-{
-  auto vec = find_nodes(hash(key));
-  for (int i = 0; i < vec.size(); i++)
-  {
-    std::string location = vec[i];
-    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
-    {
-      std::unique_lock lock(nodes_mutex);
-      nodes_map[location]._session->remove(key);
-      lock.unlock();
-    }
-  }
-}
+void broadcast_remove(std::string key);
 
 void insertNew(int i, std::string key, std::string value, long time_stamp)
 {
@@ -853,6 +827,34 @@ private:
 
   tcp::acceptor acceptor_;
 };
+void broadcast_insert(std::string key, std::string value)
+{
+  auto vec = find_nodes(hash(key));
+  for (int i = 0; i < vec.size(); i++)
+  {
+    std::string location = vec[i];
+    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+    {
+      std::unique_lock lock(nodes_mutex);
+      nodes_map[location]._session->insert(key, value);
+      lock.unlock();
+    }
+  }
+}
+void broadcast_remove(std::string key)
+{
+  auto vec = find_nodes(hash(key));
+  for (int i = 0; i < vec.size(); i++)
+  {
+    std::string location = vec[i];
+    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+    {
+      std::unique_lock lock(nodes_mutex);
+      nodes_map[location]._session->remove(key);
+      lock.unlock();
+    }
+  }
+}
 
 void insert(std::string key, std::string value, bool last = false)
 {
