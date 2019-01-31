@@ -835,7 +835,7 @@ private:
 
   tcp::acceptor acceptor_;
 };
-void broadcast_insert(std::string key, std::string value, long timestamp)
+void broadcast_insert(std::string key, std::string value, long time_stamp)
 {
   auto vec = find_nodes(hash(key));
   for (int i = 0; i < vec.size(); i++)
