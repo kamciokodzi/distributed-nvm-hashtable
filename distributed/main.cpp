@@ -297,12 +297,14 @@ void insertNew(int i, std::string key, std::string value, long time_stamp)
     if (time_stamp > time_inserted)
     {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+      std::cout<<"Diag: 0"<<std::endl;
       broadcast_insert(key, value);
     }
   }
   catch (...)
   {
     root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+    std::cout<<"Diag: 0"<<std::endl;
     broadcast_insert(key, value);
   }
 }
@@ -829,6 +831,7 @@ private:
 };
 void broadcast_insert(std::string key, std::string value)
 {
+  std::cout<<"Diag: "<<std::endl;
   auto vec = find_nodes(hash(key));
   for (int i = 0; i < vec.size(); i++)
   {
@@ -836,6 +839,7 @@ void broadcast_insert(std::string key, std::string value)
     if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
     {
       std::unique_lock lock(nodes_mutex);
+      std::cout<<"Diag: "<<vec[i]<<std::endl;
       nodes_map[location]._session->insert(key, value);
       lock.unlock();
     }
