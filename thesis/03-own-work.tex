@@ -3,7 +3,7 @@ In this chapter we will discuss the key component of our system which allows us 
 
 \section{Overview}
 
-    Each replica of \DHTS stores data locally in a purpose-built, NVM-enabled, generic hash table called \emph{\PersistentHashTable} (\PHT). \PHT exports an interface similar to Java's \HashMap \cite{HashMapJava}, and thus provides the following basic operations: \insertMethod, \getMethod or \removeMethod. Additionally, \PHT features iterators (through the \Iterator class), which can be used to perform scan operations over the entire data structure.
+    Each replica of \DHTS stores data locally in a purpose-built, NVM-enabled, generic hash table called \emph{\PersistentHashTable} (\PHT). \PHT exports an interface similar to Java's \HashMap \cite{HashMapJava}, and thus provides the following basic operations: \insertMethod, \getMethod and \removeMethod. Additionally, \PHT features iterators (through the \Iterator class), which can be used to perform scan operations over the entire data structure.
     
     When used with the \texttt{int} data type, \PHT relies on a deterministic hashing algorithm provided by John Lamping and Eric Veach \cite{Hashing}. On the other hand, in case one wants to use \PHT with non-standard, custom-defined data types, an additional hashing function has to be provided.
     
@@ -18,7 +18,7 @@ In this chapter we will discuss the key component of our system which allows us 
     
 \section{Implementation}
 
-    In Listing~\ref{NvmHashMap} we show the declaration of the \NvmHashMap template, which implements \PHT. Besides the basic hash table methods (\getMethod, \insertMethod, \removeMethod), the template features several other components:
+    In Listing~\ref{NvmHashMap} we show the declaration of the \NvmHashMap class template, which implements \PHT. Besides the basic hash table methods (\getMethod, \insertMethod, \removeMethod), the template features several other components:
     \begin{itemize}
         \item \texttt{loadFactor} -- a value which is used to determine when an \internalHashMap should be expanded in order to keep hash collisions low (situations in which multiple key-value pairs are mapped to the same hash); \texttt{loadFactor} can be adjusted upon object creation through the class constructor; the default value of \texttt{loadFactor} is 0.7, 
         \item \texttt{internalHashMap} -- an array of the \internalHashMap objects; its initial size is set to 8 and, similarly to \texttt{loadFactor}, can be adjusted through the class constructor (it is then rounded down to the largest power of 2 smaller or equal to the value provided by the programmer),
@@ -47,7 +47,7 @@ class NvmHashMap {
     friend class Iterator<K,V>;
 }
     \end{lstlisting}
-\caption{\NvmHashMap interface}
+\caption{\NvmHashMap's interface}
 \label{NvmHashMap}
 \end{figure}
 
@@ -82,9 +82,6 @@ class NvmHashMap {
     Using custom-defined data types with \NvmHashMap requires providing an additional method casting the data type to integer.
     To this end, the programmer needs to overload the comparison operator, which is used by \NvmHashMap to compare key-value pairs. 
     In Listing~\ref{StdHashOverload} we demonstrate how to define a custom casting method for a simple data structure \texttt{MyStruct}, which consists of two elements: \texttt{int} and \texttt{string}. 
-    
-    % To use custom-defined data types with \NvmHashMap, the programmer has to overload the comparison operator, used to compare key-value pairs, and provide a \texttt{to\_int} method which allows one to cast the object to an \texttt{integer}. 
-    % In Listing~\ref{StdHashOverload} we demonstrate how to define a custom hash method for a simple data structure \texttt{MyStruct}, which consists of two elements: \texttt{int} and \texttt{string}. 
     
 \begin{figure}[ht]
 \renewcommand{\figurename}{Listing}
@@ -122,7 +119,7 @@ struct MyStruct {
     An \internalHashMap is a simple hash table built as an array of linked lists.
     We opted for this approach, because linked lists are supported out-of-the-box by \libpmemobj, the library for NVM which we use. 
     
-    The basic element of \internalHashMap is called a \SegmentObject and it corresponds to a single key-value pair. \SegmentObject are arranged in linked list; all key-value pairs stored in the same linked list share a hash of their keys. A linked list which corresponds to a unique hash is called a \Segment (see Listing~\ref{Segment}). Each \Segment stores the hash value (the \texttt{hash} field) and the head of the list (the \texttt{head} field).
+    The basic element of \internalHashMap is called a \SegmentObject and it corresponds to a single key-value pair. \SegmentObjects are arranged in linked lists; all key-value pairs stored in the same linked list share a hash of their keys. A linked list which corresponds to a unique hash is called a \Segment (see Listing~\ref{Segment}). Each \Segment stores the hash value (the \texttt{hash} field) and the head of the list (the \texttt{head} field).
 
 \begin{figure}[ht]
 \renewcommand{\figurename}{Listing}
@@ -166,7 +163,7 @@ class internalHashMap {
             
     We use readers-writer locks instead of mutexes for performance reasons. This way several threads performing \getMethod operations can access simultaneously the same \internalHashMap. Naturally, \insertMethod and \removeMethod methods require exclusive access to \internalHashMap. Using readers-writer locks and an adjustable size of the \internalHashMap array means that \PHT \emph{supports full concurrency of retrievals and adjustable expected concurrency for updates} \cite{ConcurrentHashMapJava}. 
     
-    Furthermore, as the \NvmHashMap provides an \Iterator, it is worth noting that ensuring a correct iteration over such a concurrent data structure is not easy. The \iterateMethod method uses only locks in the shared mode and therefore it may provide slightly inconsistent image of the hashmap while working in a multithreaded mode: the observed values might not correspond to a snapshot view of the hash table from any moment in time. If one thread starts iterating and another one removes an item afterwards, the first one may still see it in a hashmap. The same way, if one adds an element, it may not be visible for the second one yet. This inconsistency could have been solved using an exclusive mode of locking, albeit at the cost of reducing the availability of the data. Since \PHT is meant for a multithreaded environment, we prioritise low latency in data access.
+    Furthermore, as the \NvmHashMap provides an \Iterator, it is worth noting that ensuring a correct iteration over such a concurrent data structure is not easy. The \iterateMethod method uses only one lock at a time (in the shared mode) for the currently iterated \internalHashMap and therefore it may provide slightly inconsistent image of the hashmap while working in a multithreaded mode: the observed values might not correspond to a snapshot view of the hash table from any moment in time. If one thread starts iterating and another one removes an item afterward, the first one may still see it in a hashmap. The same way, if one adds an element, it may not be visible for the second one yet. This inconsistency could have been solved by locking all the \internalHashMaps prior to iterating, albeit at the cost of reducing the availability of the data. Since \PHT is meant for a multithreaded environment, we prioritise low latency in data access.
 
 \subsection{Operations on NVM}
 
@@ -211,7 +208,7 @@ int insertIntoInternalHashMap
 }
 \end{lstlisting}
 \renewcommand{\figurename}{Listing}
-\caption{\insertMethod method}
+\caption{The \insertMethod method}
 \label{insertMethod}
 \end{figure}
     
@@ -219,7 +216,7 @@ int insertIntoInternalHashMap
     
     Before a new key-value pair can be added to the \Segment, we check whether the expand function should be executed. If so, the \internalHashMap is resized and rehashed. 
     
-    To insert a key-value pair, we iterate through the \Segment. If we find an element on the linked list (stored within the \Segment) with the same key, we update the value in a PMDK transaction. Otherwise, we also execute a PMDK transaction, in which the a new \SegmentObject containing the key and value is appended to the end of the list. Then we increment the value of \texttt{elementsCount}. Appending the \SegmentObject to the list as well as incremening \texttt{elementsCount} must be carried out in a transaction. Otherwise it is possible that upon process crash, the SegmentObject might be added to the list but \texttt{elementsCount} will stay unchanged thus making the data stored in \internalHashMap inconsistent.
+    To insert a key-value pair, we iterate through the \Segment. If we find an element on the linked list (stored within the \Segment) with the same key, we update the value in a PMDK transaction. Otherwise, we also execute a PMDK transaction, in which a new \SegmentObject containing the key and value is appended to the end of the list. Then we increment the value of \texttt{elementsCount}. Appending the \SegmentObject to the list as well as incrementing \texttt{elementsCount} must be carried out in a transaction. Otherwise, it is possible that upon process crash, the SegmentObject might be added to the list but \texttt{elementsCount} will stay unchanged thus making the data stored in the \internalHashMap inconsistent.
         
 \begin{figure}[ht]
 \renewcommand{\figurename}{Listing}
@@ -240,11 +237,11 @@ V get (K key) {
     throw "Did not found element" exception
 }
 \end{lstlisting}
-\caption{\getMethod method}
+\caption{The \getMethod method}
 \label{getMethod}
 \end{figure}
 
-        Since the \getMethod method does not modify any data, it does not need to run a PMDK transaction. Consequently, we can access data stored inside \internalHashMap in a straightforward way (see Listing~\ref{getMethod}). Note that in order to perform the \getMethod method, we obtain the appropriate lock in the shared mode. Using locks for read operations is necessary, because PMDK transactions do not provide any isolation guarantees, in particular to non-transactional code. It means that reading data stored in NVM (in or outside a transaction) could return corrupted data when there is a concurrent transaction that writes to the same memory locations. 
+        Since the \getMethod method does not modify any data, it does not need to run a PMDK transaction. Consequently, we can access data stored inside \internalHashMap in a straightforward way (see Listing~\ref{getMethod}). Note that in order to perform the \getMethod method, we obtain the appropriate lock in the shared mode. Using locks for read operations is necessary, because PMDK transactions do not provide any isolation guarantees, in particular to non-transactional code. It means that reading data stored in NVM (in or outside of a transaction) could return corrupted data when there is a concurrent transaction that writes to the same memory locations. 
 
         
 \begin{figure}[ht]
@@ -272,7 +269,7 @@ V remove (K key) {
     throw "Did not found element" exception
 }
 \end{lstlisting}
-\caption{\removeMethod method}
+\caption{The \removeMethod method}
 \label{removeMethod}
 \end{figure}
 
@@ -296,24 +293,22 @@ V remove (K key) {
         Each thread inserts 100,000 elements. 
         Then, the previously added values are retrieved. 
         In order for the test to complete successfully, all inserted items must be found. 
-        Since the \getMethod method returns a value of the retrieved element, the obtained value is compared with the added one using an assert.
+        Since the \getMethod method returns a value of the retrieved element, the obtained value is compared with the inserted one using an assert.
     \item The last test verifies the \removeMethod operation. 
         It is performed in two modes: single and multithreaded with 8 threads. 
         As in the previous test case, each thread inserts 100,000 elements. 
         Once they are inserted, the program tries to remove them from the \PHT. 
-        Considering that the \removeMethod method returns the value of the deleted element, an assert checks for the equality of the obtained value and the added one. 
-        The test ends as a success if all added values are removed.
+        Considering that the \removeMethod method returns the value of the deleted element, an assert checks for the equality of the obtained value and the inserted one. 
+        The test ends as a success if all inserted values are removed.
     \end{itemize}
 
-    One of issues that needs to be taken into account while developing unit tests is the non-volatile nature of the data kept in the \NvmHashMap. In a traditional system which uses traditional RAM, many tests can be performed in one test suite as the data kept in memory are automatically freed in-between tests. However, due to the use of NVM, \PHT keeps the data in the non-volatile memory even after a test completes. Therefore we need to manually manage memory in our test suites. To this end, we run each each test as a separate program instance. That way the files on which we operate to emulate NVM can be deleted and the memory cleared in between tests.  
+    One of issues that needs to be taken into account while developing unit tests is the non-volatile nature of the data kept in the \NvmHashMap. In a traditional system which uses traditional RAM, many tests can be performed in one test suite as the data kept in memory are automatically freed in-between tests. However, due to the use of NVM, \PHT keeps the data in the non-volatile memory even after a test completes. Therefore, we need to manually manage memory in our test suites. To this end, we run each test as a separate program instance. That way the files on which we operate to emulate NVM can be deleted and the memory cleared in between tests.  
 
-    Developing the unit tests suite allowed us to find several bugs and therefore improve our implementation. One of encountered problems concerned the \Iterator class. If no item had been added to the \PHT, using \Iterator resulted in a program crash. Moreover, the preliminary test results made us look closer at the performance of the \insertMethod method, which took much longer to complete than expected. After a thorough analysis we were able to identify the \expandMethod method (triggered by \insertMethod) as a bottle neck.
+    Developing the unit tests suite allowed us to find several bugs and therefore improve our implementation. One of encountered problems concerned the \Iterator class. If no item had been added to the \PHT, using \Iterator resulted in a program crash. Moreover, the preliminary test results made us look closer at the performance of the \insertMethod method, which took much longer to complete than expected. After a thorough analysis we were able to identify the \expandMethod method (triggered by \insertMethod) as a bottleneck.
 
-    In order to check the data consistency of our system, we carried out several recovery tests, which proceeded as follows. First, we start a thread that is supposed to insert 1,000,000 elements to \PHT. Then we terminate the thread before it completes its work. Next, using an \Iterator we check what values were added to the \PHT and whether the application crashed. Once the application is operational, we insert the rest of the elements and ensure that all of them were added. Thanks to the use of PMDK transactions, we managed to ensure data consistency in all of our tests.
+    In order to check the data consistency of our system, we carried out several recovery tests, which proceeded as follows. First, we start a thread that is supposed to insert 1,000,000 elements to \PHT. Then we terminate the thread before it completes its work. Next, using an \Iterator we check what values were inserted into the \PHT and whether the application crashed. Once the application is operational, we insert the rest of the elements and ensure that all of them were added. Thanks to the use of PMDK transactions, we managed to ensure data consistency in all of our tests.
     
 \subsection{Performance tests}
-
-    % \tk{Can you increase the font size on the plots?}
 
     The performance tests aimed at comparing the effectiveness of the NVM-enabled \PHT with an analogous hash table, called \StandardHashMap, implemented in a traditional fashion, on top of RAM. \StandardHashMap provides the same interface as \NvmHashMap.
     
@@ -329,47 +324,40 @@ V remove (K key) {
     \begin{figure}[ht]
         \centering
         \includegraphics[width=0.8\textwidth]{thesis/figures/insert.png}
-        \caption{Time necessary to perform 5,000,000 \insertMethod operations on \PHT and \StandardHashMap.}
+        \caption{The time necessary to perform 5,000,000 \insertMethod operations on \PHT and \StandardHashMap.}
         \label{insertPlot}
     \end{figure}
     
     \begin{figure}[ht]
         \centering
         \includegraphics[width=0.8\textwidth]{thesis/figures/get.png}
-        \caption{Time necessary to perform 5,000,000 \getMethod operations on \PHT and \StandardHashMap.}
+        \caption{The time necessary to perform 5,000,000 \getMethod operations on \PHT and \StandardHashMap.}
         \label{getPlot}
     \end{figure}
     
     \begin{figure}[ht]
         \centering
         \includegraphics[width=0.8\textwidth]{thesis/figures/remove.png}
-        \caption{Time necessary to perform 5,000,000 \removeMethod operations on \PHT and \StandardHashMap.}
+        \caption{The time necessary to perform 5,000,000 \removeMethod operations on \PHT and \StandardHashMap.}
         \label{removePlot}
     \end{figure}
     
     The tests results are shown on plots in Figures~\ref{insertPlot},~\ref{getPlot} and~\ref{removePlot}. One can see that in all test cases there is a noticeable NVM-induced time overhead. However, both our implementations scales well with the increasing number of threads.
     
-    The \insertMethod method in the NVM implementation takes the longest time since it allocates memory and creates a new object. Furthermore, it requires an exclusive access to the \internalHashMap and resizes it when necessary. Since in each test the \texttt{threads} number varies, there is a different number of \internalHashMap objects. In the test with only one thread, the sole \internalHashMap expands about nine times while inserting 5,000,000 key-value pairs. On the contrary, the test with 8 threads uses 8 \internalHashMaps and therefore each of them expands 7 times on average. 
+    The \insertMethod method in the NVM implementation takes the longest time since it allocates memory and creates a new object. Furthermore, it requires exclusive access to the \internalHashMap and resizes it when necessary. Since in each test the \texttt{threads} number varies, there is a different number of \internalHashMap objects. In the test with only one thread, the sole \internalHashMap expands about nine times while inserting 5,000,000 key-value pairs. On the contrary, the test with 8 threads uses 8 \internalHashMaps and therefore each of them expands 7 times on average. 
     
-    The \getMethod operation is the fastest of implemented methods as it requires only a shared access to the \internalHashMap.
+    The \getMethod operation is the fastest of implemented methods as it requires only shared access to the \internalHashMap.
     It is about 2.5 times slower in the NVM-enabled implementation compared to \StandardHashMap, what means that access to persistent memory is generally slower than access to DRAM. 
-    That overhead is caused by emulation.
-    %every time a transaction starts, PMDK creates a snapshot of the persistent memory.
-    %It is used for tracking the changes made during the transaction and may be used to revert them in case that the transaction will be rolled back.
-    % \tk{what transaction in \getMethod? Not consistent with what you said earlier about the \getMethod method.}
+    We assume that this overhead is caused by the bigger memory consumption in the case of NVM and more cache misses.
     
-    The \removeMethod method turns out to be about 5 times slower in the NVM-based environment than the RAM one. It turns out to be a little bit faster compared to the \insertMethod, because freeing an object requires less work compared to allocating memory. Still, however, \removeMethod needs to do so in a PMDK transaction. 
+    The \removeMethod method turns out to be about 8 times slower in the NVM-based environment than the RAM one. It turns out to be a little bit faster compared to the \insertMethod, because freeing an object requires less work compared to allocating memory. Still, however, \removeMethod needs to do so in a PMDK transaction. 
     
-    %\tk{what was in them, ints? strings? how big?} -- (int, int) pairs
-    %\tk{In how much space?}
-    Besides measuring the throughput of \PHT in comparison to the \StandardHashMap's performance, we are interested in the memory overhead resulting from storing data in NVM. 
+    Besides measuring the throughput of \PHT in comparison to the \StandardHashMap's performance, we are interested in the memory overhead resulting from storing the data in NVM. 
     To perform this test we decided to limit memory which may be allocated by \PHT and \StandardHashMap to 100 MB.
     In case of \StandardHashMap we are able to insert around 800,000 pairs of \integersMap into the map. \PHT is less memory efficient and allows us to insert only 136,000 pairs of \integersMap. 
-    This disparity can be explained by the fact that currently the \libpmemobjcpp library allows one only to allocate pointers to persistent memory for blocks which are at least 4 KB in size.
-    %\noindent \tk{What about the memory footprint? How many key-value pairs can you insert into lets say 100MB of memory in \PHT and \unorderedMap?}. 
+    This disparity can be explained by the fact that objects in NVM are referred to using persistent pointers (\texttt{pmem::obj::persistent\_ptr}), which occupy more space in the memory, compared to regular C/C++ pointers. Moreover, \libpmemobjcpp requires some additional space for persistent memory management.
     
     To sum up, \PHT is a considerably slower compared to \StandardHashMap, but it allows data to be recovered upon the process crash. The observed overhead is due to additional processing required when working with NVM. 
-    %\tk{maybe something like: all operations on the persistent objects are performed within transactions which means that accessing each object requires writes to the internal PMDK log? this should be explained in Section 3.2.4 }. % described above 
     However, both implementations scale similarly well. 
             
 \section{Conclusions}
@@ -377,6 +365,6 @@ V remove (K key) {
     In this chapter we discussed \PHT, a custom-built hash table, which supports non-volatile memory. 
     Extensive tests allowed us to ensure its correctness and uncover several subtle bugs related to ensuring consistency of data upon process crashes.
     
-    Unsurprisingly, \PHT turns out to be slower than a standard concurrent implementation of a hash table (\StandardHashMap), which relies solely on RAM. Our tests indicate that using NVM incurrs a significant but still acceptable overhead.
+    Unsurprisingly, \PHT turns out to be slower than a standard concurrent implementation of a hash table (\StandardHashMap), which relies solely on RAM. Our tests indicate that using NVM incurs a significant but still acceptable overhead.
     The \getMethod method takes about 2,5 times more time to complete compared to its corresponding operation of the standard hash table, while \insertMethod and \removeMethod methods about 5-10 times on average. \PHT also requires around five times more memory compared to its traditional counterpart. \PHT handles well workloads in which there are multiple threads accessing it at the same time. \PHT's scalability is on par with the scalability of the standard hash table implementation.
     

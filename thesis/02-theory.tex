@@ -7,14 +7,13 @@ In this chapter we will discuss concepts and technologies used to develop our sy
 
     \subsection{Definitions}
         \NVM (NVM) is a class of memory storage devices which are able to keep data after power outage. Consequently, they are suitable for systems which rely on data durability, such as database systems.
-        Nowadays a noticable drawback of this type of memory is a fact that it is much slower than their volatile counterparts.  
+        Nowadays a noticeable drawback of this type of memory is a fact that it is much slower than their volatile counterparts.  
         Currently high-performance NVM solutions are expensive and offer low capacity while still having a significant lack of performance in comparison to DRAM memory. 
         The performance of NVM, however, is still improving and the gap between NVM and DRAM is expected to be insignificant in the future. 
         
         \PM (PM) is a byte-addressable, non-volatile memory which can be directly accessed via the memory bus.
         
     \subsection{Access to NVM}
-        %\tk{Correct me if I'm wrong, but it seems to me that at least Intel uses the same technology to created PM as well as for a new kind of SSDs, which are treated by the operating system as block devices (Intel Optane?).}
     
         In most computer applications access to data storage proceeds as follows:
         \begin{itemize}
@@ -28,21 +27,18 @@ In this chapter we will discuss concepts and technologies used to develop our sy
         It allows applications to directly access individual bytes of the storage without the necessity to operate on entire blocks. By memory-mapping files located in the file system present in the PM, the processes attach a region of persistent memory to their address space and simply use it as an ordinary operating memory  segment.
       
     \subsection{Emulation}
-        NVM hardware is not yet easily available and during this project we were not able obtain an access to it. However, in order to build and test NVM-enabled applications, it is possible to emulate the hardware by marking segments of ordinary RAM as persistent and creating a DAX-enabled file system on them \cite{PmemEmulation}.
-        % Emulation is based on DRAM memory, which is recognised by operating system as persistent memory region.
+        NVM hardware is not yet easily available and during this project we were not able obtain access to it. However, in order to build and test NVM-enabled applications, it is possible to emulate the hardware by marking segments of ordinary RAM as persistent and creating a DAX-enabled file system on them \cite{PmemEmulation}.
         Such an environment, which we call \emph{emulated Persistent Memory}, naturally will not keep data after power outage, but it will provide performance comparable to the performance of the envisioned NVM hardware solutions. Alternatively, regular stable storage could be used for emulation, but such an approach would induce severe performance penalty. 
         
     \subsection{Developing applications for NVM}
         
-        %\tk{This subsection requires more details. Why do we get corrupted or incomplete data? Why a mutex won't be released? Because after a crash, the state of processes/threads is not restored. Processes operate in RAM, cache and processor registers, the contents all of which can be lost event though NVM is used. Maybe give an example of what might happen. }
-    
         Programming for persistent memory differs from programming for volatile memory. 
         In case of this project there are two most important differences that should be considered.
         
-        Firstly, persistent memory is not reinitialised after the application restart. It implies that a data structure kept in PM might include some corrupted or incomplete data, which in turn may result in the program crash or some incorrect and unexpected behaviour. Such situations may occur when an application is aborted, by user interaction or by exception coming from other thread, when performing write operation to memory. In that case, data will be saved only partially. To prevent such situations a transactional mechanism can be employed (as in the \libpmemobj library, which we use to access NVM, see Chapter~\ref{OwnWork}). Then all writes to NVM are performed within a transaction, which guarantees that they will be executed atomically.
+        Firstly, persistent memory is not reinitialised after the application restart. It implies that a data structure kept in PM might include some corrupted or incomplete data, which in turn may result in the program crash or some incorrect and unexpected behaviour. Such situations may occur when an application is aborted, by user interaction or by exception coming from other thread, when performing write operation to memory. In that case, data will be saved only partially. To prevent such situations a transactional mechanism can be employed (as in the \libpmemobj library, which we used to access NVM, see Chapter~\ref{OwnWork}). Then all writes to NVM are performed within a transaction, which guarantees that they will be executed atomically.
         
         Secondly, using persistent memory together with mutexes for inter-thread synchronisation may lead to unintended behaviour. 
-        For processes which operate in RAM, a mutex is stored in the volatile memory. When that process terminates, memory allocated by the process is released, so upon the subsequent execution the mutex will be reinitialised and set to unlocked. When a process operates in non-volatile memory and terminates when the mutex is locked, its state is kept in persistent memory. When the process
+        For processes which operate in RAM, a mutex is stored in the volatile memory. Once that process terminates, memory allocated by the process is released, so upon the subsequent execution the mutex will be reinitialised and set to unlocked. If a process operates in non-volatile memory and terminates when the mutex is locked, its state is kept in persistent memory. When the process
         restarts, the mutex will not be reinitialised and will be still locked. As a consequence, when a thread crashes after locking a mutex stored in NVM, it may never unlock which results in a deadlock. To solve that problem there is a special type of NVM-aware mutexes which are stored in the persistent memory, but are reinitialised on the program startup when necessary. 
       
 \section{Persistent Memory Development Kit}
@@ -70,12 +66,12 @@ In this chapter we will discuss concepts and technologies used to develop our sy
     \end{enumerate}
     
     
-\section{Distributed hash table} % distributed hash table
+\section{Distributed hash table}
 
     This section covers the general concepts of creating a distributed system for the implemented data structure. 
 
     \subsection{Amazon Dynamo}
-        As already mentioned in Chapter~\ref{Introduction}, the architecture of \DHTS follows the design principles of \Dynamo. 
+        As already mentioned in Chapter~\ref{Introduction}, the architecture of \DHTS follows the design principles of \Dynamo \cite{AmazonDynamo}. 
         Since Amazon is one of the largest e-commerce companies, their services are used by millions of users concurrently.
         The global scale of Amazon's services imply the employment of an extensive amount of computing and network infrastructure around the world.
         In such an architecture single units' failures are inevitable and have to be taken into account when designing the system.
@@ -124,22 +120,25 @@ In this chapter we will discuss concepts and technologies used to develop our sy
             \label{ConsistentHashingImage2}
         \end{figure}
         
-    \subsection{Replication} 
+    \subsection{Replication}
+    \label{replication}
         Since distributed systems can fail at any time we need to store data in a way that allows us to cope well with machine crashes. Storing any data item only on one node means that the data might be lost if the node crashes. Hence, data needs to be replicated. In order to specify on how many nodes each data item is to be replicated we define a configuration parameter called the \textit{replication factor}. 
         
-        Consistent hashing can be easily extended to account for multiple replicas of each data item. To this end, for every node a full copy of its locally stored data is also kept on the neighbouring nodes (when looking clockwise). The total number of the replicas that store the same data depends on the replication factor. In consequence, when the first node on the ring that stores some data becomes unavailable and does not repond to the client's queries, the requests can be send to the next node on the ring. When a node crash is detected, the data maintained by this node (which are still available through the other nodes) are further replicated in order to satisfy the desired replication level.
+        In highly available systems concurrent writes to nodes that store copies of the same data usually are not coordinated in any way. The \emph{eventual convergence} of the nodes to the same state is typically achieved by establishing some arbitrary, deterministic order of all updates. For instance, in Apache Cassandra \cite{Cassandra}, a popular NoSQL data store, when a node receives a client request containing updates to some data items, first it assigns a timestamp to it using its internal clock. Then, such a request is broadcast to all nodes that replicate the data items, so that each node can execute the request independently. A node applies an update to a data item it stores only if the request timestamp is greater than the timestamp of the most recent update to the data item given. Otherwise, the update is discarded. Such an approach, originally described by Thomas \cite{Tho79}, but usually referred to as the \emph{last-write-wins}, policy guarantees that if all nodes that replicate the same data receive all (updating) requests, regardless of the order in which they receive them, the nodes will converge to the same state. Then we say that such a system guarantees \emph{eventual consistency} \cite{V09}. In \DHTS we use the last-write-wins policy for conflict resolution between concurrent writes to the same keys.
+        
+        Consistent hashing can be easily extended to account for multiple replicas of each data item. To this end, for every node a full copy of its locally stored data is also kept on the neighbouring nodes (when looking clockwise). The total number of the replicas that store the same data depends on the replication factor. In consequence, when the first node on the ring that stores some data becomes unavailable and does not respond to the client's queries, the requests can be send to the next node on the ring. When a node crash is detected, the data maintained by this node (which are still available through the other nodes) are further replicated in order to satisfy the desired replication level.
         
     \subsection{Used programming libraries}
         The first version of \DHTS used the \emph{Seastar} networking library \cite{Seastar}. The final version uses \Asio\cite{Asio}. Below we describe both libraries and explain why we ultimately used the latter.
     
         \subsubsection{Seastar}
-            \Seastar is an event-driven framework which allows the programmer to write non-blocking, asynchronous code. \Seastar is optimized for complex server applications running on modern multi-core machines. Among others, \Seastar features the share-nothing programming model and a custom networking stack, which enables direct access to the network interface buffers on a certain class of hardware. \Seastar's API is based on \textit{futures} and \textit{continuations}, thus providing the asynchronous programming model. The most well known use case of \Seastar is ScyllaDB\cite{ScyllaDB}, a highly optimized C++-based drop-in replacement for Apache Cassandra\cite{Cassandra}, a very popular NoSQL data store.
+            \Seastar is an event-driven framework which allows the programmer to write non-blocking, asynchronous code. \Seastar is optimized for complex server applications running on modern multi-core machines. Among others, \Seastar features the share-nothing programming model and a custom networking stack, which enables direct access to the network interface buffers on a certain class of hardware. \Seastar's API is based on \textit{futures} and \textit{continuations}, thus providing the asynchronous programming model. The most well known use case of \Seastar is ScyllaDB \cite{ScyllaDB}, a highly optimized C++-based drop-in replacement for Apache Cassandra.
             
             The \Seastar framework caused many problems with development. The description of the building and configuration process provided by \Seastar's authors is complicated and incomplete. \Seastar's  documentation is missing some crucial informationa and many functions or classes are not described, e.g.: \texttt{engine} class. The provided code samples do not allow one to easily build a basic working client-server application.
             
             We tried to conduct the initial tests of \Seastar on Ubuntu 18.04 LTS, one of the officially supported Linux distributions. Due to the never ending problems in deploying the library, we eventually migrated to Fedora 27, which proved much easier to configure properly. 
             
-            Later in the development process, we encountered a problem which proved to hard to overcome. The problem occurred when we tried to merge PHT with our \Seastar-based middleware. During initialisation, the \Seastar framework performed changes of the \texit{hugepages} \cite{Hugepages}, which made PMDK unable to allocate memory.
+            Later in the development process, we encountered a problem which proved too hard to overcome. The problem occurred when we tried to merge PHT with our \Seastar-based middleware. During initialisation, the \Seastar framework performed changes of the \texit{hugepages} \cite{Hugepages}, which made PMDK unable to allocate memory.
             
         \subsubsection{Boost Asio}
             \Asio is a C++ networking library which is mainly designed for the asynchronous programming model. \Asio is a part of the \textit{Boost} library, and it offers:
