@@ -281,34 +281,80 @@ std::string str_timestamp()
   return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
-void insertNew(int i, std::string key, std::string value, long time_stamp) {
-  try {
-    std::string val = root_ptr->pmap[i]->get(key);
-    auto vec = deserialize(val);
-    long time_inserted = std::stol(vec[0]);
 
-    if (time_stamp > time_inserted) {
-      root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+void broadcast_insert(std::string key, std::string value)
+{
+  auto vec = find_nodes(hash(key));
+  for (int i = 0; i < vec.size(); i++)
+  {
+    std::string location = vec[i];
+    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+    {
+      std::unique_lock lock(nodes_mutex);
+      nodes_map[location]._session->insert(key, value);
+      lock.unlock();
     }
-  } catch (...) {
-    root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
   }
 }
-std::string removeElement(int i, std::string key, long time_stamp) {
-  try {
+
+void broadcast_remove(std::string key)
+{
+  auto vec = find_nodes(hash(key));
+  for (int i = 0; i < vec.size(); i++)
+  {
+    std::string location = vec[i];
+    if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+    {
+      std::unique_lock lock(nodes_mutex);
+      nodes_map[location]._session->remove(key);
+      lock.unlock();
+    }
+  }
+}
+
+void insertNew(int i, std::string key, std::string value, long time_stamp)
+{
+  try
+  {
     std::string val = root_ptr->pmap[i]->get(key);
     auto vec = deserialize(val);
     long time_inserted = std::stol(vec[0]);
 
-    if (time_stamp > time_inserted) {
+    if (time_stamp > time_inserted)
+    {
+      root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+      broadcast_insert(key, value);
+    }
+  }
+  catch (...)
+  {
+    root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+    broadcast_insert(key, value);
+  }
+}
+std::string removeElement(int i, std::string key, long time_stamp)
+{
+  try
+  {
+    std::string val = root_ptr->pmap[i]->get(key);
+    auto vec = deserialize(val);
+    long time_inserted = std::stol(vec[0]);
+
+    if (time_stamp > time_inserted)
+    {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
-      if (vec.size() > 1) {
+      broadcast_remove(key);
+      if (vec.size() > 1)
+      {
         return vec[1];
       }
     }
     return "None";
-  } catch (...) {
+  }
+  catch (...)
+  {
     root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
+    broadcast_remove(key);
     return "None";
   }
 }
@@ -354,7 +400,7 @@ public:
                             [this, self](boost::system::error_code ec, std::size_t length) {
                               if (!ec)
                               {
-                                                                  // std::cout<<data_<<std::endl;
+                                // std::cout<<data_<<std::endl;
 
                                 std::vector<std::string> cmd = deserialize(std::string(data_));
                                 if (cmd[0] == "connect")
@@ -464,7 +510,8 @@ public:
                                   bool last = true;
                                   for (int i = 2; i < cmd.size(); i += 2)
                                   {
-                                    if (cmd[i].size() > 4 && cmd[i].size()  < 20) {
+                                    if (cmd[i].size() > 4 && cmd[i].size() < 20)
+                                    {
                                       if (nodes_map.find(cmd[i] + ":" + cmd[i + 1]) == nodes_map.end())
                                       {
                                         last = false;
@@ -516,18 +563,24 @@ public:
                                   {
                                     std::string value = root_ptr->pmap[0]->get(cmd[2]);
                                     //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << value << std::endl;
-                                    if (cmd.size() >= 4) {
+                                    if (cmd.size() >= 4)
+                                    {
                                       write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value + "_last");
-                                    } else {
+                                    }
+                                    else
+                                    {
                                       write("getResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
                                     }
                                   }
                                   catch (...)
                                   {
                                     //std::cout << "[MAP] Element not found" << std::endl;
-                                    if (cmd.size() >= 4) {
+                                    if (cmd.size() >= 4)
+                                    {
                                       write("getResultBad_" + str_timestamp() + "_" + cmd[2] + "_last");
-                                    } else {
+                                    }
+                                    else
+                                    {
                                       write("getResultBad_" + str_timestamp() + "_" + cmd[2]);
                                     }
                                   }
@@ -552,24 +605,33 @@ public:
                                     {
                                       nodes_map[vec[0]]._session->insert(cmd[2], cmd[3]);
                                     }
-                                    if (cmd.size() >= 5) {
-                                      if (cmd[4] == "last") {
+                                    if (cmd.size() >= 5)
+                                    {
+                                      if (cmd[4] == "last")
+                                      {
                                         write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
-                                      } else {
+                                      }
+                                      else
+                                      {
                                         write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
                                       }
-                                    } else {
+                                    }
+                                    else
+                                    {
                                       write("insertResult_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
-                                    }                                    
+                                    }
                                   }
                                   catch (...)
                                   {
                                     std::cout << "[MAP] Element not found" << std::endl;
-                                    if (cmd.size() >= 5) {
+                                    if (cmd.size() >= 5)
+                                    {
                                       write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3] + "_last");
-                                    } else {
+                                    }
+                                    else
+                                    {
                                       write("insertResultBad_" + str_timestamp() + "_" + cmd[2] + "_" + cmd[3]);
-                                    }                                     
+                                    }
                                   }
                                 }
                                 else if (cmd[0] == "remove")
@@ -585,12 +647,15 @@ public:
                                         auto value = removeElement(i, cmd[2], std::stol(cmd[1]));
                                         //auto value = root_ptr->pmap[i]->remove(cmd[2]);
                                         //std::cout << "[MAP] Removed element in map=" << i << " with key=" << cmd[2] << std::endl;
-                                        
-                                        if (cmd.size() >= 5) {
+
+                                        if (cmd.size() >= 5)
+                                        {
                                           write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value + "_last");
-                                        } else {
+                                        }
+                                        else
+                                        {
                                           write("removeResult_" + str_timestamp() + "_" + cmd[2] + "_" + value);
-                                        } 
+                                        }
                                         done = true;
                                       }
                                     }
@@ -609,11 +674,13 @@ public:
                                 else if (cmd[0] == "getResult")
                                 {
                                   //std::cout << "[MAP] Found element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
-                                  if (cmd.size() >= 5) {
-                                    if (cmd[4] == "last") {
+                                  if (cmd.size() >= 5)
+                                  {
+                                    if (cmd[4] == "last")
+                                    {
                                       auto end = std::chrono::system_clock::now();
-                                      std::chrono::duration<double> elapsed_time = end-start_time;
-                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl;
+                                      std::chrono::duration<double> elapsed_time = end - start_time;
+                                      std::cout << "End test msg: " << elapsed_time.count() << " seconds" << std::endl;
                                     }
                                   }
                                 }
@@ -624,11 +691,13 @@ public:
                                 else if (cmd[0] == "insertResult")
                                 {
                                   //std::cout << "[MAP] Inserted element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
-                                  if (cmd.size() >= 5) {
-                                    if (cmd[4] == "last") {
+                                  if (cmd.size() >= 5)
+                                  {
+                                    if (cmd[4] == "last")
+                                    {
                                       auto end = std::chrono::system_clock::now();
-                                      std::chrono::duration<double> elapsed_time = end-start_time;
-                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl; 
+                                      std::chrono::duration<double> elapsed_time = end - start_time;
+                                      std::cout << "End test msg: " << elapsed_time.count() << " seconds" << std::endl;
                                     }
                                   }
                                 }
@@ -639,11 +708,13 @@ public:
                                 else if (cmd[0] == "removeResult")
                                 {
                                   // std::cout << "[MAP] Removed element with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
-                                  if (cmd.size() >= 5) {
-                                    if (cmd[4] == "last") {
+                                  if (cmd.size() >= 5)
+                                  {
+                                    if (cmd[4] == "last")
+                                    {
                                       auto end = std::chrono::system_clock::now();
-                                      std::chrono::duration<double> elapsed_time = end-start_time;
-                                      std::cout<<"End test msg: "<< elapsed_time.count() <<" seconds" << std::endl; 
+                                      std::chrono::duration<double> elapsed_time = end - start_time;
+                                      std::cout << "End test msg: " << elapsed_time.count() << " seconds" << std::endl;
                                     }
                                   }
                                 }
@@ -661,7 +732,7 @@ public:
                                   int c = std::stoi(cmd[3]);
                                   int j = 1;
 
-                                  std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+                                  std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
                                   start_time = std::chrono::system_clock::now();
 
                                   // for (const auto &[key, value] : nodes_map)
@@ -669,18 +740,18 @@ public:
                                   //   if (key != my_addr) {
                                   //     value._session->write("test_" + std::to_string(el*j) + "_" + el + "_" + c);
                                   //     j++;
-                                  //   }          
+                                  //   }
                                   // }
 
-                                  for (int i = s; i < el; i+=c) {
+                                  for (int i = s; i < el; i += c)
+                                  {
                                     insert(std::to_string(i), message_const);
                                   }
                                   insert(std::to_string(l), message_const, true);
 
                                   auto end = std::chrono::system_clock::now();
-                                  std::chrono::duration<double> elapsed_time = end-start_time;
-                                  std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
-
+                                  std::chrono::duration<double> elapsed_time = end - start_time;
+                                  std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
                                 }
                                 else if (cmd[0] == "sleep")
                                 {
@@ -711,10 +782,9 @@ public:
   {
     auto self(shared_from_this());
 
-    int size = msg.length()+1;
+    int size = msg.length() + 1;
 
-    msg.append(message_format.substr(0,max_length - size));
-
+    msg.append(message_format.substr(0, max_length - size));
 
     //std::cout<<msg.length() + 1<<std::endl;
 
@@ -784,104 +854,116 @@ private:
   tcp::acceptor acceptor_;
 };
 
-void insert(std::string key, std::string value, bool last = false) {
+void insert(std::string key, std::string value, bool last = false)
+{
   try
-    {
-      // std::cout<<key<<std::endl;
+  {
+    // std::cout<<key<<std::endl;
 
-      auto vec = find_nodes(hash(key));
-      for (int i = 0; i < vec.size(); i++)
-      {
-        std::string location = vec[i];
-        //std::cout << "Server: ";
-        if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
-        {
-          //std::cout << location << std::endl;
-          std::unique_lock lock(nodes_mutex);
-          if (last) {
-            nodes_map[location]._session->insert(key, value, true);
-          } else {
-            nodes_map[location]._session->insert(key, value);
-          }
-          lock.unlock();
-        }
-        else
-        {
-          //std::cout << "local" << std::endl;
-          insertNew(i, key, value, timestamp());
-          //root_ptr->pmap[i]->insertNew(key, value);
-          //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << key << " and value=" << value << std::endl;
-        }
-      }
-    }
-    catch (...)
+    auto vec = find_nodes(hash(key));
+    for (int i = 0; i < vec.size(); i++)
     {
-      std::cout << "[MAP] Element not found" << std::endl;
-    }
-}
-void remove(std::string key, bool last = false) {
-  try
-    {
-      auto vec = find_nodes(hash(key));
-      for (int i = 0; i < vec.size(); i++)
-      {
-        std::string location = vec[i];
-        // std::cout << "Server: ";
-        if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
-        {
-          // std::cout << location << std::endl;
-          std::unique_lock lock(nodes_mutex);
-          if (last) {
-            nodes_map[location]._session->remove(key, true);
-          } else {
-            nodes_map[location]._session->remove(key);
-          }
-          lock.unlock();
-        }
-        else
-        {
-          // std::cout << "local" << std::endl;
-          auto value = removeElement(i, key, timestamp());
-          //std::string value = root_ptr->pmap[i]->remove(key);
-          // std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
-        }
-      }
-    }
-    catch (...)
-    {
-      std::cout << "[MAP] Element not found" << std::endl;
-    }
-}
-void get(std::string key, bool last = false) {
-  try
-    {
-      auto vec = find_nodes(hash(key));
-
-      std::string location = vec[0];
+      std::string location = vec[i];
       //std::cout << "Server: ";
-      if (location != my_addr)
+      if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
       {
         //std::cout << location << std::endl;
         std::unique_lock lock(nodes_mutex);
-        if (last) {
-          nodes_map[location]._session->get(key, true);
-        } else {
-          std::cout<<"Get: "<<key<<std::endl;
-          nodes_map[location]._session->get(key);
+        if (last)
+        {
+          nodes_map[location]._session->insert(key, value, true);
+        }
+        else
+        {
+          nodes_map[location]._session->insert(key, value);
         }
         lock.unlock();
       }
       else
       {
         //std::cout << "local" << std::endl;
-        std::string value = root_ptr->pmap[0]->get(key);
-        //std::cout << "[MAP] Found element with key=" << key << " and value=" << value << std::endl;
+        insertNew(i, key, value, timestamp());
+        //root_ptr->pmap[i]->insertNew(key, value);
+        //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << key << " and value=" << value << std::endl;
       }
     }
-    catch (...)
+  }
+  catch (...)
+  {
+    std::cout << "[MAP] Element not found" << std::endl;
+  }
+}
+void remove(std::string key, bool last = false)
+{
+  try
+  {
+    auto vec = find_nodes(hash(key));
+    for (int i = 0; i < vec.size(); i++)
     {
-      std::cout << "[MAP] Element not found" << std::endl;
+      std::string location = vec[i];
+      // std::cout << "Server: ";
+      if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
+      {
+        // std::cout << location << std::endl;
+        std::unique_lock lock(nodes_mutex);
+        if (last)
+        {
+          nodes_map[location]._session->remove(key, true);
+        }
+        else
+        {
+          nodes_map[location]._session->remove(key);
+        }
+        lock.unlock();
+      }
+      else
+      {
+        // std::cout << "local" << std::endl;
+        auto value = removeElement(i, key, timestamp());
+        //std::string value = root_ptr->pmap[i]->remove(key);
+        // std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
+      }
     }
+  }
+  catch (...)
+  {
+    std::cout << "[MAP] Element not found" << std::endl;
+  }
+}
+void get(std::string key, bool last = false)
+{
+  try
+  {
+    auto vec = find_nodes(hash(key));
+
+    std::string location = vec[0];
+    //std::cout << "Server: ";
+    if (location != my_addr)
+    {
+      //std::cout << location << std::endl;
+      std::unique_lock lock(nodes_mutex);
+      if (last)
+      {
+        nodes_map[location]._session->get(key, true);
+      }
+      else
+      {
+        std::cout << "Get: " << key << std::endl;
+        nodes_map[location]._session->get(key);
+      }
+      lock.unlock();
+    }
+    else
+    {
+      //std::cout << "local" << std::endl;
+      std::string value = root_ptr->pmap[0]->get(key);
+      //std::cout << "[MAP] Found element with key=" << key << " and value=" << value << std::endl;
+    }
+  }
+  catch (...)
+  {
+    std::cout << "[MAP] Element not found" << std::endl;
+  }
 }
 
 void *keyboard(void *arg)
@@ -894,45 +976,47 @@ void *keyboard(void *arg)
 
     if (cmd[0] == "test")
     {
-      if (cmd[1] == "insert") 
+      if (cmd[1] == "insert")
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
         int c = std::stoi(cmd[4]);
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c) {
+        for (int i = s; i < l; i += c)
+        {
           insert(std::to_string(i), std::to_string(i));
         }
         insert(std::to_string(l), std::to_string(l), true);
 
         auto end = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_time = end-start_time;
-        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+        std::chrono::duration<double> elapsed_time = end - start_time;
+        std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
       }
-      else if (cmd[1] == "1") 
+      else if (cmd[1] == "1")
       {
         int l = 2600000;
         int s = 0;
         int c = 13;
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c) {
+        for (int i = s; i < l; i += c)
+        {
           insert(std::to_string(i), message_const);
         }
         insert(std::to_string(l), message_const, true);
 
         auto end = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_time = end-start_time;
-        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+        std::chrono::duration<double> elapsed_time = end - start_time;
+        std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
       }
-      else if (cmd[1] == "2") 
+      else if (cmd[1] == "2")
       {
-        
+
         int size = nodes_map.size();
 
         int l = 2600000;
@@ -941,61 +1025,65 @@ void *keyboard(void *arg)
         int c = 13;
         int j = 1;
 
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
         start_time = std::chrono::system_clock::now();
 
         for (const auto &[key, value] : nodes_map)
         {
-          if (key != my_addr) {
-            value._session->write("test_" + std::to_string(el*j) + "_" + std::to_string(el) + "_" + std::to_string(c));
+          if (key != my_addr)
+          {
+            value._session->write("test_" + std::to_string(el * j) + "_" + std::to_string(el) + "_" + std::to_string(c));
             j++;
-          }          
+          }
         }
 
-        for (int i = s; i < el; i+=c) {
+        for (int i = s; i < el; i += c)
+        {
           insert(std::to_string(i), message_const);
         }
         insert(std::to_string(l), message_const, true);
 
         auto end = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_time = end-start_time;
-        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+        std::chrono::duration<double> elapsed_time = end - start_time;
+        std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
       }
-      else if (cmd[1] == "get") 
+      else if (cmd[1] == "get")
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
         int c = std::stoi(cmd[4]);
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i+=c) {
+        for (int i = s; i < l; i += c)
+        {
           get(std::to_string(i));
         }
         get(std::to_string(l), true);
 
         auto end = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_time = end-start_time;
-        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
+        std::chrono::duration<double> elapsed_time = end - start_time;
+        std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
       }
-      if (cmd[1] == "remove") 
+      if (cmd[1] == "remove")
       {
         int l = std::stoi(cmd[3]) + std::stoi(cmd[2]);
         int s = std::stoi(cmd[2]);
-        std::cout<<"Start test: "<<l<<" elements from index: "<< s <<std::endl;
+        std::cout << "Start test: " << l << " elements from index: " << s << std::endl;
 
         start_time = std::chrono::system_clock::now();
 
-        for (int i = s; i < l; i++) {
+        for (int i = s; i < l; i++)
+        {
           remove(std::to_string(i));
         }
         remove(std::to_string(l), true);
 
         auto end = std::chrono::system_clock::now();
-        std::chrono::duration<double> elapsed_time = end-start_time;
-        std::cout<<"End test local: "<< elapsed_time.count() <<" seconds" << std::endl;
-      } 
+        std::chrono::duration<double> elapsed_time = end - start_time;
+        std::cout << "End test local: " << elapsed_time.count() << " seconds" << std::endl;
+      }
     }
 
     else if (cmd[0] == "sleep" && cmd.size() >= 3)
@@ -1149,8 +1237,9 @@ void *keyboard(void *arg)
 
     else if (cmd[0] == "count")
     {
-      for (int i = 0; i < REPLICATION_FACTOR; i++) {
-        
+      for (int i = 0; i < REPLICATION_FACTOR; i++)
+      {
+
         Iterator<std::string, std::string> it(root_ptr->pmap[i]);
 
         int count = 0;
@@ -1165,7 +1254,7 @@ void *keyboard(void *arg)
           {
           }
         }
-        std::cout << "Elements in map "<< i << ": "<< count << std::endl;
+        std::cout << "Elements in map " << i << ": " << count << std::endl;
       }
     }
 
@@ -1189,10 +1278,12 @@ int main(int argc, char *argv[])
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
   //std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
-  for (int i = 0; i < 1024; i++ ) {
+  for (int i = 0; i < 1024; i++)
+  {
     message_format.append("0");
   }
-  for (int i = 0; i < 512; i++ ) {
+  for (int i = 0; i < 512; i++)
+  {
     message_const.append("m");
   }
 
