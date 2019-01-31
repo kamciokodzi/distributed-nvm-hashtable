@@ -391,7 +391,7 @@ public:
                                   std::cout << "New node: " << cmd[2] << ":" << cmd[3] << std::endl;
                                   std::cout << cmd[4] << std::endl;
 
-                                  node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0), time_stamp());
+                                  node n = node(this, cmd[2], cmd[3], strtoul(cmd[4].c_str(), nullptr, 0), timestamp());
                                   std::unique_lock lock(nodes_mutex);
                                   nodes_map[cmd[2] + ":" + cmd[3]] = n;
                                   lock.unlock();
