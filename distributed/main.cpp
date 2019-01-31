@@ -281,6 +281,38 @@ std::string str_timestamp()
   return std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch()).count());
 }
 
+void insertNew(int i, std::string key, std::string value, long time_stamp) {
+  try {
+    std::string val = root_ptr->pmap[i]->get(key);
+    auto vec = deserialize(val);
+    long time_inserted = std::stol(vec[0]);
+
+    if (time_stamp < time_inserted) {
+      root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+    }
+  } catch (...) {
+    root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
+  }
+}
+std::string removeElement(int i, std::string key, long time_stamp) {
+  try {
+    std::string val = root_ptr->pmap[i]->get(key);
+    auto vec = deserialize(val);
+    long time_inserted = std::stol(vec[0]);
+
+    if (time_stamp < time_inserted) {
+      root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
+      if (vec.size() > 1) {
+        return vec[1];
+      }
+    }
+    return "None";
+  } catch (...) {
+    root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
+    return "None";
+  }
+}
+
 class session
     : public std::enable_shared_from_this<session>
 {
@@ -510,7 +542,8 @@ public:
                                     {
                                       if (vec[i] == my_addr)
                                       {
-                                        root_ptr->pmap[i]->insertNew(cmd[2], cmd[3]);
+                                        insertNew(i, cmd[2], cmd[3], std::stol(cmd[1]));
+                                        //root_ptr->pmap[i]->insertNew(cmd[2], cmd[3]);
                                         //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << cmd[2] << " and value=" << cmd[3] << std::endl;
                                         done = true;
                                       }
@@ -549,7 +582,8 @@ public:
                                     {
                                       if (vec[i] == my_addr)
                                       {
-                                        auto value = root_ptr->pmap[i]->remove(cmd[2]);
+                                        auto value = removeElement(i, cmd[2], std::stol(cmd[1]));
+                                        //auto value = root_ptr->pmap[i]->remove(cmd[2]);
                                         //std::cout << "[MAP] Removed element in map=" << i << " with key=" << cmd[2] << std::endl;
                                         
                                         if (cmd.size() >= 5) {
@@ -720,7 +754,7 @@ public:
   tcp::socket socket_;
   enum
   {
-    max_length = 4096
+    max_length = 1024
   };
   char data_[max_length];
 };
@@ -774,7 +808,8 @@ void insert(std::string key, std::string value, bool last = false) {
         else
         {
           //std::cout << "local" << std::endl;
-          root_ptr->pmap[i]->insertNew(key, value);
+          insertNew(i, key, value, timestamp());
+          //root_ptr->pmap[i]->insertNew(key, value);
           //std::cout << "[MAP] Inserted element in map=" << i << " with key=" << key << " and value=" << value << std::endl;
         }
       }
@@ -806,7 +841,8 @@ void remove(std::string key, bool last = false) {
         else
         {
           // std::cout << "local" << std::endl;
-          std::string value = root_ptr->pmap[i]->remove(key);
+          auto value = removeElement(i, key, timestamp());
+          //std::string value = root_ptr->pmap[i]->remove(key);
           // std::cout << "[MAP] Removed element with key=" << key << " and value=" << value << std::endl;
         }
       }
@@ -1004,7 +1040,8 @@ void *keyboard(void *arg)
             else
             {
               std::cout << "local" << std::endl;
-              root_ptr->pmap[i]->insertNew(cmd[1], cmd[2]);
+              insertNew(i, cmd[1], cmd[2], timestamp());
+              //root_ptr->pmap[i]->insertNew(cmd[1], cmd[2]);
               std::cout << "[MAP] Inserted element in map=" << i << " with key=" << cmd[1] << " and value=" << cmd[2] << std::endl;
             }
           }
@@ -1079,7 +1116,8 @@ void *keyboard(void *arg)
             else
             {
               std::cout << "local" << std::endl;
-              std::string value = root_ptr->pmap[i]->remove(cmd[1]);
+              auto value = removeElement(i, cmd[1], timestamp());
+              //std::string value = root_ptr->pmap[i]->remove(cmd[1]);
               std::cout << "[MAP] Removed element with key=" << cmd[1] << " and value=" << value << std::endl;
             }
           }
@@ -1151,10 +1189,10 @@ int main(int argc, char *argv[])
   std::string path = "/mnt/ramdisk/hashmapFile" + vm["port"].as<std::string>();
   //std::string path = "hashmapFile" + vm["port"].as<std::string>();
 
-  for (int i = 0; i < 4096; i++ ) {
+  for (int i = 0; i < 1024; i++ ) {
     message_format.append("0");
   }
-  for (int i = 0; i < 2048; i++ ) {
+  for (int i = 0; i < 512; i++ ) {
     message_const.append("m");
   }
 
