@@ -6,7 +6,7 @@ Traditional computers use two types of memories: Random Access Memory (RAM) for 
 
 Recently one can observe the emergence of a new technology called \emph{Non-Volatile Memory} (NVM) (sometimes also referred to as \emph{Persistent Memory}, PM). NVM is aimed as a replacement for both RAM and disks by combining their best features. NVM promises high throughput, low latency and byte addressability, similarly to RAM, but it will also guarantee data persistence in case of power outage \cite{NvmPerformanceArticle}. 
 
-NVM creates new possibilities as well as many challenges in the IT sector. Incorporating NVM will result in significant improvements in the performance of computer systems. It is because storing and retrieving large amounts of data will happen much more quickly. Moreover, thanks to NVM, complex services running on the Internet will not require complicated caching mechanisms to overcome the performance limitations of the traditional data storage solutions. NVM will also ease the process of recovery after computer crashes, i.e., providing data durability will be straightforward and the time consuming process of loading data from disks to memory upon recovery will not be necessary any longer. Therefore one can expect that the use of NVM will particularly beneficial in distributed systems, which often feature crash recovery procedures that heavily rely on the synchronous access to the stable storage. 
+NVM creates new possibilities as well as many challenges in the IT sector. Incorporating NVM will result in significant improvements in the performance of computer systems. It is because storing and retrieving large amounts of data will happen much more quickly. Moreover, thanks to NVM, complex services running on the Internet will not require complicated caching mechanisms to overcome the performance limitations of the traditional data storage solutions. NVM will also ease the process of recovery after computer crashes, i.e., providing data durability will be straightforward and the time consuming process of loading data from disks to memory upon recovery will not be necessary any longer. Therefore, one can expect that the use of NVM will particularly beneficial in distributed systems, which often feature crash recovery procedures that heavily rely on the synchronous access to the stable storage. 
 
 However, leveraging the capabilities of NVM means that a new approach to designing and implementing applications is needed. In particular, memory has to be carefully allocated so no memory leaks occur when the application crashes. For the similar reason, write operations to NVM must be properly managed in order to ensure that the data kept in memory is always consistent.
 
@@ -15,7 +15,7 @@ However, leveraging the capabilities of NVM means that a new approach to designi
 The main goal of the following thesis was to design, implement and test the \textbf{NVM-enabled distributed hash table system} and thus to evaluate the benefits and costs of using NVM to create a highly available distributed application. 
 The design of our system, which is called \DHTS, follows the principles of Amazon Dynamo \cite{AmazonDynamo}. It means that the system is composed of multiple nodes, each of which has similar responsibilities (there is no central coordinator) and that the system can easily scale horizontally by adding new nodes to it. Nodes communicate using a gossip protocol. For durability, each node stores data in a custom-built NVM-enabled hash table called \emph{Persistent Hash Table (\PHT)}. In order to provide high availability data is additionally replicated across multiple nodes. The level of data replication is tunable via a configuration parameter.
 
-In order to build \PHT, our local NVM-enabled hash table, we relied on \emph{Persistent Memory Development Kit} \cite{PmemIo}, a set of libraries and tools provided by Intel for NVM. NVM is a new technology and although some NVM hardware is already available on the market, we did not have access to it. Therefore we opted for NVM emulation using RAM.
+In order to build \PHT, our local NVM-enabled hash table, we relied on \emph{Persistent Memory Development Kit} \cite{PmemIo}, a set of libraries and tools provided by Intel for NVM. NVM is a new technology and although some NVM hardware is already available on the market, we did not have access to it. Therefore, we opted for NVM emulation using RAM.
 
 We developed a range of tests to evaluate the performance independently for \PHT and \DHTS. The tests results of \PHT show the inherent overhead introduced by using NVM to manage data: accessing and modifying data stored in NVM is 2-10 times slower compared to similar operations performed on volatile RAM. Moreover, NVM requires that some metadata are stored alongside data. The memory overhead is caused by the fact that in NVM libraries memory has to be allocated in blocks of fixed size. 
 
@@ -34,111 +34,3 @@ The structure of the thesis is as follows. In Chapter~\ref{Background} we discus
     \item Kamil Kołodziej -- the configuration of the virtualization environment using Docker, the design and implementation of \DHTS,
     \item Miłosz Pogodski -- the design and implementation of \DHTS, tests of \DHTS.
 \end{itemize}
-
-
-\endinput
-
-NVM is particularly 
-Today's servers scales well horizontally providing high performance in handling concurrent requests.
-Despite the fact that throughput is high enough, processing is often limited by execution of I/O operations between memory stack.
-The expensive access to storage problem is especially visible in peer-to-peer systems where the data is spread between nodes. 
-If one of them crashes and needs to reboot, its data is lost. 
-Reloading it each time from the disk space results in a significant time overhead.
-Therefore, using \textit{non-volatile memory}, which supports direct access, is a better choice for a distributed system.
-NVM is a type of computer memory which provides persistent data storage at the expense of slightly higher cost and lower performance than RAM.
-Keeping that in mind NVM can be a new future development trend.
-Once loaded, data will be available for system to access whether it is newly booted system or working one.
-
-
-In order to get acquainted with the described technology we decided to implement a distributed hashmap which supports persistent memory.
-Given that idea we could get to know the benefits and drawbacks of NVM and then adapt it to a real use case while developing a distributed system.
-We assumed that it should operate on a modern architecture with NVM on the processor's memory bus.
-Despite the fact that the introduced solution is still in development, it can be emulated with RAM.
-Keeping that in mind the performance evaluations could be slightly inaccurate but should give us a brief overview of new possibilities.
-
-high cost of access.
-Today's servers scales well horizontally providing high performance in handling concurrent requests.
-Despite the fact that throughput is high enough, processing is often limited by execution of I/O operations between memory stack.
-The expensive access to storage problem is especially visible in peer-to-peer systems where the data is spread between nodes. 
-If one of them crashes and needs to reboot, its data is lost. 
-Reloading it each time from the disk space results in a significant time overhead.
-Therefore, using \textit{non-volatile memory}, which supports direct access, is a better choice for a distributed system.
-NVM is a type of computer memory which provides persistent data storage at the expense of slightly higher cost and lower performance than RAM.
-Keeping that in mind NVM can be a new future development trend.
-Once loaded, data will be available for system to access whether it is newly booted system or working one.
-That is why cost of rebooting systems should be decreased and overall performance of distributed system should be higher.
-Research shows that NVM provides low latency reads and writes just like DRAM supporting persistent writes and a storage capacity similar to SSDs. \cite{NvmPerformanceArticle}
-
-
-
-
-
-\libpmemobj, Intel's C++ library for NVM.
-To achieve the described goals we used tools such as \textit{Persistent Memory Development Kit} \cite{PmemIo} and \textit{Boost} \cite{Asio}, mostly relying on their online documentation.
-Since \NVM with Direct Access support is still a new concept, its development pattern is not commonly known and we had to provide our own solutions to encountered problems.
-
-and operate on it through its read and write operations.
-One of the most important project assumptions is that the nodes should be able to join or to leave the system at any time without any negative consequences for the data integrity.
-The data shall have high availability, which is one of the most important components of the CAP theorem \cite{CAP}.
-That means that the client has to get a response regardless of the state of any node in the system.
-Achieving high availability requires the system to have no downtimes and to be operational all the time.
-Furthermore, the system needs to be fault-tolerant and work correctly despite the possible failure of any node, which could be resolved in two ways.
-Firstly, since all nodes operate on persistent memory, their data is not lost even after going offline. 
-If a node reconnects, the data may just need to be updated. 
-However, the system has to keep the node's data in case it does not rejoin due to a failure.
-As a solution to the described problem we provide a replication of the nodes data among others.
-In order to effectively test the project, it needs to be run on several machines. 
-To ease the setup process, we decided to create a virtual environment for the project.
-Having the system implemented, we evaluated both the NVM and concurrent access performance.
-
-To achieve the described goals we used tools such as \textit{Persistent Memory Development Kit} \cite{PmemIo} and \textit{Boost} \cite{Asio}, mostly relying on their online documentation.
-Since \NVM with Direct Access support is still a new concept, its development pattern is not commonly known and we had to provide our own solutions to encountered problems.
-On the other hand, the implemented distributed system was premised on \Dynamo \cite{AmazonDynamo} principles which are covered in Chapter \ref{Background}.
-Its approach is well-known highly valuable guide for creating a distributed systems with high availability.
-
-We managed to implement a concurrent \textit{Persistent Hash Table} (\PHT) with enabled non-volatile memory. 
-We developed a decentralised and symmetrical distributed system consisted of many nodes which support \PHT.
-The nodes are able to connect to the network at any time, providing stable performance.
-Furthermore, thanks to introduced replication mechanism, the system is highly resistant to the nodes failures.
-The implementation provides stable performance and scales linearly.
-
-% Patryk - konfiguracja nvm, praca nad hash table map
-% Kinga - struktura mapy, testy mapy
-% Kamil - help struktura mapy, expand, rozproszenie, docker
-% Miłosz - architekt aplikacji rozproszonej, mistrz kodzenia, krol hashringu i wielu nodow, testy na hpc
-
-
-% Wstęp\footnote{Treść przykładowych rozdziałów została skopiowana
-% z ,,zasad'' redakcji prac dyplomowych FCMu~\cite{fcm-red}.} do pracy powinien zawierać następujące elementy:
-% \begin{itemize}
-%     \item krótkie uzasadnienie podjęcia tematu; 
-%     \item cel pracy (patrz niżej); 
-%     \item zakres (przedmiotowy, podmiotowy, czasowy) wyjaśniający, w jakim rozmiarze praca będzie realizowana; 
-%     \item ewentualne hipotezy, które autor zamierza sprawdzić lub udowodnić; 
-%     \item krótką charakterystykę źródeł, zwłaszcza literaturowych; 
-%     \item układ pracy (patrz niżej), czyli zwięzłą charakterystykę zawartości poszczególnych rozdziałów; 
-%     \item ewentualne uwagi dotyczące realizacji tematu pracy np.~trudności, które pojawiły się w trakcie 
-%     realizacji poszczególnych zadań, uwagi dotyczące wykorzystywanego sprzętu, współpraca z firmami zewnętrznymi. 
-% \end{itemize}
-
-% \noindent
-% \textbf{Wstęp do pracy musi się kończyć dwoma następującymi akapitami:}
-% \begin{quote}
-% Celem pracy jest opracowanie / wykonanie analizy / zaprojektowanie / ...........
-% \end{quote}
-% oraz:
-% \begin{quote}
-% Struktura pracy jest następująca. W rozdziale 2 przedstawiono przegląd literatury na temat ........ 
-% Rozdział 3 jest poświęcony ....... (kilka zdań). 
-% Rozdział 4 zawiera ..... (kilka zdań) ............ itd. 
-% Rozdział X stanowi podsumowanie pracy. 
-% \end{quote}
-
-% W przypadku prac inżynierskich zespołowych lub magisterskich 2-osobowych, po tych dwóch w/w akapitach 
-% musi w pracy znaleźć się akapit, w którym będzie opisany udział w pracy poszczególnych członków zespołu. Na przykład:
-
-% \begin{quote}
-% Jan Kowalski w ramach niniejszej pracy wykonał projekt tego i tego, opracował ......
-% Grzegorz Brzęczyszczykiewicz wykonał ......, itd. 
-% \end{quote}
-

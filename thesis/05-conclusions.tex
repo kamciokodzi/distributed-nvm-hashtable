@@ -1,74 +1,24 @@
 \chapter{Conclusions} \label{Conclusion}
 
-% \section{Overview}
+The main goal of our thesis was to explore the capabilities of \emph{non-volatile memory} in the context of distributed systems. We did so by designing and implementing a system called \DHTS.
+\DHTS is an NVM-enabled, highly available and scalable distributed hash table with tunable level of data replication. The system was designed following the principles of Amazon Dynamo and uses a custom-built generic local hash table implementation built on top of the Intel's \libpmemobj library.
 
-The main goal of our thesis was to explore the capabilities of \NVM in the context of distributed systems by designing and implementing a system called \DHTS. It is a NVM-enabled, highly available distributed hash table with tunable level of data replication.
-The system was designed following the principles of Amazon Dynamo and uses a custom-built generic local hash table implementation built on top of the Intel's \libpmemobj library.
+Since we did not have access to persistent memory hardware, we emulated it in RAM. This, in turn, allowed us to measure the inherent overhead introduced by the additional computation performed by \libpmemobj in order to reliably store data in NVM. \PHT, our local NVM-enabled hash table that functions as the backend for \DHTS, was slower 2--10 times compared to the traditional hash table implemented in an analogous way but which relied solely on RAM. The observed difference in performance is significant, but still acceptable, given that the data kept in NVM is persistent. 
 
-%\tk{What should follow:
-%\begin{itemize}
-%    \item Briefly, how your system performs, 
-%    \item what are the pros and cons,
-%    \item what can be improved and how  - described in development opportunities
-%    \item what you learned and if it was worthwhile)
-%    \item you can mention what has been most challenging
-%    \item please no corporate mumbo-jumbo talk about minimum value product
-%\end{itemize}}
+The results of the experimental evaluation of \DHTS indicate that it scales well with the increasing number of nodes.
 
-As an initial part of our work we gained knowledge about the \NVM and programming libraries for two purposes: NVM-support and distributed programming. 
-We identified expected performance of NVM as located in between DRAM and Solid State Drive with possibilities for improvement in the future. 
-For programming environment we have chosen C++ language with \PMDK. 
-It is set of libraries developed by Intel Corporation that provides access to Persistent Memory.
+NVM is a very promising new technology but it is not yet commonly recognised. Prior to the project start we knew very little about NVM, how it operates and how a programmer can harness its capabilities. The work on the thesis allowed us to learn how to design, implement and test applications that rely on it. We also gained valuable knowledge about the current limitations of the tools that we relied on, e.g., not very efficient memory management and the lack of the support for polymorphism in \libpmemobjcpp and not documented problems with application deployment caused by conflicts between the used libraries.
 
-The first step of developing our application was to create \PHT, an NVM-enabled, generic hashmap with support for concurrency.
-Using \PMDK we created solution based on the \texttt{ConcurrentHashMap} data structure in Java 7. 
-It consists of several \internalHashMaps, each with its own readers-writers lock to provide high availability and thread-safety while accessed by multiple threads. Implementing such data structure meant overcoming a number of challenges, e.g. correctly defining operations within transactions, handling generic data types in and concurrency or choosing the suitable hash function.
-After development phase we performed some unit tests to validate our implementation's correctness, and performance tests to compare our product with other solutions.
-As expected, operations on \PHT are slower, depending on test case 2 - 10 times than its DRAM counterpart.
+We also learned a great deal about the design of modern, highly-available services running on the Internet. \DHTS, similarly to such systems, lacks a central coordinator and is easily scalable, albeit at the cost of having only a simple \insertMethod/\getMethod/\removeMethod-method-based interface.
 
-As a second step of this project we developed distributed, decentralised system.
-First version was based on \Seastar, but in final version we used \Asio due to problems with integration of \Seastar and \textit{PMDK}
-The provided system consists of several \Nodes which are aware of other peers in network. 
-To divide data between \Nodes we use the concept of \textit{consistent hashing}.
-It assigns every peer in network some range of hash ring based on result on hash function of its port and IP address. 
-That range may change over time as more nodes connect to the network.
-In the final product every \Node stores data assigned to it in its internal \PHT. 
+\section{Future work}
 
-Next step was to merge parts created in previous steps together, to acquire \DHTS in result. 
-During this operation we encountered the problem with using \Seastar and \textit{PMDK} within one application, so we decide to change used technology to \Asio. 
-When we solved the described problem we added an instance of \PHT to every Node, as stated above, and implemented \texttt{add}, \texttt{remove} and \texttt{get} operations on the system.
+There are several ways in which our work can be further improved.
 
-When we finished development of the final product we conducted some performance tests for the whole system. We have inserted fixed amount (200,000) of pairs \stringsMap into the network and measured time of this operation in function of the nodes count.
-The results met our expectations -- system scales well with the number of nodes connected to the network. 
+Firstly, we would like to implement a fully-fledged catch-up mechanism that ensures that the nodes that replicate the same data always eventually converge to the same state (the current implementation relies on reliable broadcast).
 
-During this project we have learned a lot about the idea of \NVM. It is new trend in programming, not commonly known, what makes this kind of knowledge especially valuable. 
-Implementing \PHT allowed us to gain practical knowledge about implementing concurrent, high-available systems. Finally, during development of \DHTS we gained experience in creating distributed system based on TCP sockets. We managed to propagate data inside it and resolve common problems in such systems: asynchronous communication, unknown communication delay and so on.
+Secondly, we would like to extend \DHTS with a mechanism that allows one to easily iterate over the whole data set kept by the system's nodes. Currently we support only iteration over the data set on each node independently.
 
-\section{Development opportunities}
+Finally, we would also like to test our system using hardware persistent memory and find out how it performs. Tests conducted in such an environment would give us a glimpse at the current performance and usability of the NVM technology. 
 
-There are several ways of possible improvement of our product.
-
-In current version of our system situations when \Node disconnects from the network are not fully supported.
-When it reconnects before being requested by any of its peers it does not cause any negative impact on the \DHTS. 
-However, since such requests may leave system in inconsistent state, the failure detection system should be improved.
-
-What is more, \DHTS does not provide a method which allows to get global state of the hashmap. 
-Each node has the ability to iterate through the elements it stores, but the system does not provide a way to collect such data from all nodes.
-
-Because of the nature of distributed systems the communication between the nodes is asynchronous which means that requests created earlier may be handled after their successors.
-Therefore a mechanism resolving such situations could be implemented.
-Requests modifying the same elements in a short period of time are called collisions.
-The most popular solution to this problem in high-available systems is based on timestamps which allow the system to determine the operations order.
-
-What is more, conducting performance tests of provided system using hardware \PM solution could lead to interesting insights.
-Results of those tests would show current performance and usability of NVM technology. 
-
-
-% Zakończenie pracy zwane również Uwagami końcowymi lub Podsumowaniem powinno zawierać ustosunkowanie
-% się autora do zadań wskazanych we wstępie do pracy, a w szczególności do celu i zakresu pracy oraz
-% porównanie ich z faktycznymi wynikami pracy. Podejście takie umożliwia jasne określenie stopnia
-% realizacji założonych celów oraz zwrócenie uwagi na wyniki osiągnięte przez autora w ramach jego
-% samodzielnej pracy.
-
-% Integralną częścią pracy są również dodatki, aneksy i załączniki np.~płyty CDROM
-% zawierające stworzone w ramach pracy programy, aplikacje i projekty.
+\endinput
