@@ -1,4 +1,3 @@
-#include "map.hpp"
 #include <iostream>
 #include <libpmemobj++/pool.hpp>
 #include <libpmemobj++/persistent_ptr.hpp>
