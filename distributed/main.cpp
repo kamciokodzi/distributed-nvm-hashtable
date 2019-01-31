@@ -287,7 +287,7 @@ void insertNew(int i, std::string key, std::string value, long time_stamp) {
     auto vec = deserialize(val);
     long time_inserted = std::stol(vec[0]);
 
-    if (time_stamp < time_inserted) {
+    if (time_stamp > time_inserted) {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
     }
   } catch (...) {
@@ -300,7 +300,7 @@ std::string removeElement(int i, std::string key, long time_stamp) {
     auto vec = deserialize(val);
     long time_inserted = std::stol(vec[0]);
 
-    if (time_stamp < time_inserted) {
+    if (time_stamp > time_inserted) {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
       if (vec.size() > 1) {
         return vec[1];
