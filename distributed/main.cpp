@@ -282,9 +282,9 @@ std::string str_timestamp()
 }
 
 
-void broadcast_insert(std::string key, std::string value);
+void broadcast_insert(std::string key, std::string value, long time_stamp);
 
-void broadcast_remove(std::string key);
+void broadcast_remove(std::string key, long time_stamp);
 
 void insertNew(int i, std::string key, std::string value, long time_stamp)
 {
@@ -297,13 +297,13 @@ void insertNew(int i, std::string key, std::string value, long time_stamp)
     if (time_stamp > time_inserted)
     {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
-      broadcast_insert(key, value);
+      broadcast_insert(key, value, time_stamp);
     }
   }
   catch (...)
   {
     root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp) + "_" + value);
-    broadcast_insert(key, value);
+    broadcast_insert(key, value, time_stamp);
   }
 }
 std::string removeElement(int i, std::string key, long time_stamp)
@@ -317,7 +317,7 @@ std::string removeElement(int i, std::string key, long time_stamp)
     if (time_stamp > time_inserted)
     {
       root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
-      broadcast_remove(key);
+      broadcast_remove(key, time_stamp);
       if (vec.size() > 1)
       {
         return vec[1];
@@ -328,7 +328,7 @@ std::string removeElement(int i, std::string key, long time_stamp)
   catch (...)
   {
     root_ptr->pmap[i]->insertNew(key, std::to_string(time_stamp));
-    broadcast_remove(key);
+    broadcast_remove(key, time_stamp);
     return "None";
   }
 }
@@ -786,6 +786,10 @@ public:
   {
     write("insert_" + str_timestamp() + "_" + key + "_" + value + "_last");
   }
+  void insert(std::string key, std::string value, long time_stamp)
+  {
+    write("insert_" + std::to_string(time_stamp) + "_" + key + "_" + value);
+  }
   void remove(std::string key)
   {
     write("remove_" + str_timestamp() + "_" + key);
@@ -793,6 +797,10 @@ public:
   void remove(std::string key, bool last)
   {
     write("remove_" + str_timestamp() + "_" + key + "_last");
+  }
+  void remove(std::string key, long time_stamp)
+  {
+    write("remove_" + std::to_string(time_stamp) + "_" + key);
   }
 
   tcp::socket socket_;
@@ -827,7 +835,7 @@ private:
 
   tcp::acceptor acceptor_;
 };
-void broadcast_insert(std::string key, std::string value)
+void broadcast_insert(std::string key, std::string value, long timestamp)
 {
   auto vec = find_nodes(hash(key));
   for (int i = 0; i < vec.size(); i++)
@@ -836,12 +844,12 @@ void broadcast_insert(std::string key, std::string value)
     if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
     {
       std::unique_lock lock(nodes_mutex);
-      nodes_map[location]._session->insert(key, value);
+      nodes_map[location]._session->insert(key, value, time_stamp);
       lock.unlock();
     }
   }
 }
-void broadcast_remove(std::string key)
+void broadcast_remove(std::string key, long time_stamp)
 {
   auto vec = find_nodes(hash(key));
   for (int i = 0; i < vec.size(); i++)
@@ -850,7 +858,7 @@ void broadcast_remove(std::string key)
     if (location != (vm["my_addr"].as<std::string>() + ":" + vm["port"].as<std::string>()))
     {
       std::unique_lock lock(nodes_mutex);
-      nodes_map[location]._session->remove(key);
+      nodes_map[location]._session->remove(key, time_stamp);
       lock.unlock();
     }
   }
