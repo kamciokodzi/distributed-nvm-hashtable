@@ -1,1 +1,0 @@
-docker run --privileged -it -v $PWD:/deployment -w /deployment/build pmd-star bash
