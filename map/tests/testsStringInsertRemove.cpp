@@ -24,12 +24,6 @@ bool file_exists(const char *fname) {
 
 pmem::obj::persistent_ptr<root> root_ptr;
 
-void insertFromThread(int tid) {
-    for(int i = ELEMENTS_COUNT_CORRECTNESS; i >= 0; i--) {
-        root_ptr->pmap->insertNew(std::to_string(i*THREADS_COUNT+tid), std::to_string(i*THREADS_COUNT+tid));
-    }
-}
-
 void removeFromThread(int tid) {
     for(int i = 100; i >= 0; i--) {
         root_ptr->pmap->remove(std::to_string(i*64+tid));

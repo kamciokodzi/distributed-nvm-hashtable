@@ -15,6 +15,35 @@
 #include <string.h>
 #include <cmath>
 #include <shared_mutex>
+#include <cstdlib> 
+
+template<class T>
+int64_t typeToInteger(T arg);
+
+template <>
+int64_t typeToInteger(std::string arg)
+{
+    int64_t result = 0;
+    for(int i = 0; i < arg.length(); i++) {
+        result += pow(arg[i], i);
+    }
+    return result;
+}
+
+
+template <>
+int64_t typeToInteger(const char* tab_arg)
+{
+    std::string arg(tab_arg);
+    int64_t result = 0;
+    for(int i = 0; i < arg.length(); i++) {
+        result += pow(arg[i], i);
+    }
+    return result;
+}
+
+template <>
+int64_t typeToInteger(int arg) {return arg;}
 
 template<class, class>
 class Iterator;
@@ -42,7 +71,7 @@ public:
 template<class K, class V>
 class Segment {
 public:
-    pmem::obj::p<int> hash;
+    pmem::obj::p<int32_t> hash;
     pmem::obj::p<int> size = 0;
     pmem::obj::persistent_ptr <SegmentObject<K, V>> head = nullptr;
 };
@@ -80,9 +109,17 @@ private:
     pmem::obj::persistent_ptr <ArrayOfSegments<K, V>[] > arrayOfSegments;
     pmem::obj::persistent_ptr <pmem::obj::shared_mutex[]> arrayOfMutex;
 
-    unsigned long long int hash(K key) {
-        unsigned long long int keyPositive = (unsigned long long int) std::hash<K>()(key);
-        return abs(keyPositive);
+    int32_t hash(K keyString) {
+        int64_t key = typeToInteger(keyString);
+        int32_t range = 1000000;
+        int64_t b = 1;
+        int64_t j = 0;
+        for(int i = 0; i < 5; i++) {
+            b = j;
+            key = key * 2862933555777941757ULL + j;
+            j = (b + 1) * (double(1LL << 31) / double((key >> 33) + 1));
+        }
+        return fabs(b % range);
     }
 
     NvmHashMap<K, V> *getPtr() {
@@ -174,6 +211,7 @@ public:
         int index2 = hash % arrayOfSegments[index].arraySize;
         std::shared_lock <pmem::obj::shared_mutex> lock(arrayOfMutex[index]);
         pmem::obj::persistent_ptr <SegmentObject<K, V>> ptr = arrayOfSegments[index].segments[index2].head;
+
 
         while (true) {
             if (ptr == nullptr) {
@@ -306,22 +344,27 @@ public:
     Iterator(pmem::obj::persistent_ptr <NvmHashMap<K, V>> map) {
 
         mapPointer = map->getPtr();
-        currentArrayIndex = 0;
-        currentSegmentIndex = 0;
-        std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
-        currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
-        currentSegment = currentArray->segments[currentArrayIndex];
-        currentSegmentObject = currentSegment.head;
-	if(currentSegmentObject == nullptr) {
-	    next();
-	}
+        currentArrayIndex = -1;
+        currentSegmentIndex = -1;
     }
 
-    V get() {
+    V getValue() {
 	return currentSegmentObject->value.get_ro();
     }
 
+    K getKey() {
+        return currentSegmentObject->key.get_ro();
+    }
+
     bool next() {
+        if(currentArrayIndex == -1) {
+            currentArrayIndex = 0;
+            currentSegmentIndex = 0;
+            std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
+            currentArray = &mapPointer->arrayOfSegments[currentArrayIndex];
+            currentSegment = currentArray->segments[currentArrayIndex];
+            currentSegmentObject = currentSegment.head;
+        }
 	while (true) {
             if (currentSegmentObject != nullptr && currentSegmentObject->next != nullptr) {
                 std::shared_lock <pmem::obj::shared_mutex> lock(mapPointer->arrayOfMutex[currentArrayIndex]);
